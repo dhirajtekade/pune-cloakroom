@@ -143,33 +143,78 @@ export default function CheckInView() {
 }
 
 const printTokens = (tokenId, name, mobile, bagCount) => {
-  // 1. Format the Mahatma Tag (The Master Receipt)
-  let printData = `
+  const ESC = "\x1B";
+  const GS = "\x1D";
+  const CENTER = ESC + "\x61\x01";
+  const LEFT = ESC + "\x61\x00";
+  const BOLD_ON = ESC + "\x45\x01";
+  const BOLD_OFF = ESC + "\x45\x00";
+  const JUMBO = ESC + "\x21\x30"; // Double height + Double width
+  const NORMAL = ESC + "\x21\x00";
+  const FEED = "\n\n\n";
+
+  // 1. MAHATMA MASTER LABEL
+  let mahatmaTag = `
+${CENTER}${BOLD_ON}PUNE SEVA CLOAKROOM${BOLD_OFF}
 --------------------------------
-      PUNE SEVA CLOAKROOM
+${CENTER}MAHATMA COPY
+${JUMBO}${tokenId}${NORMAL}
 --------------------------------
-TOKEN ID: ${tokenId}
-NAME: ${name}
+${LEFT}NAME: ${name.toUpperCase()}
 MOBILE: ${mobile}
 TOTAL BAGS: ${bagCount}
-DATE: ${new Date().toLocaleDateString()}
+TIME: ${new Date().toLocaleTimeString()}
 --------------------------------
-  PLEASE KEEP THIS TAG SAFE
---------------------------------
-\n\n\n`;
+${CENTER}Please show this for pickup
+${FEED}`;
 
-  // 2. Format the Bag Tags (One for each bag)
+  // 2. INDIVIDUAL BAG LABELS
+  let bagTags = "";
   for (let i = 1; i <= bagCount; i++) {
-    printData += `
+    bagTags += `
+${CENTER}${BOLD_ON}BAG TAG${BOLD_OFF}
+${JUMBO}${tokenId}${NORMAL}
 --------------------------------
-    BAG TAG: ${i} / ${bagCount}
+${CENTER}BAG: ${i} OF ${bagCount}
 --------------------------------
-      TOKEN: ${tokenId}
---------------------------------
-\n\n\n`;
+${FEED}`;
   }
 
-  // 3. Send to RawBT Android App via Intent
-  const encodedData = encodeURIComponent(printData);
-  window.location.href = `intent:${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+  const fullPrint = mahatmaTag + bagTags;
+
+  // Encode and send to RawBT
+  const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
+  window.location.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
 };
+
+// const printTokens = (tokenId, name, mobile, bagCount) => {
+//   // 1. Format the Mahatma Tag (The Master Receipt)
+//   let printData = `
+// --------------------------------
+//       PUNE SEVA CLOAKROOM
+// --------------------------------
+// TOKEN ID: ${tokenId}
+// NAME: ${name}
+// MOBILE: ${mobile}
+// TOTAL BAGS: ${bagCount}
+// DATE: ${new Date().toLocaleDateString()}
+// --------------------------------
+//   PLEASE KEEP THIS TAG SAFE
+// --------------------------------
+// \n\n\n`;
+
+//   // 2. Format the Bag Tags (One for each bag)
+//   for (let i = 1; i <= bagCount; i++) {
+//     printData += `
+// --------------------------------
+//     BAG TAG: ${i} / ${bagCount}
+// --------------------------------
+//       TOKEN: ${tokenId}
+// --------------------------------
+// \n\n\n`;
+//   }
+
+//   // 3. Send to RawBT Android App via Intent
+//   const encodedData = encodeURIComponent(printData);
+//   window.location.href = `intent:${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+// };
