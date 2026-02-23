@@ -45,9 +45,9 @@ export default function CheckInView() {
 
       <form onSubmit={handleCheckIn} className="space-y-5">
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
+          {/* <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
             Bag Count
-          </label>
+          </label> */}
           <div className="flex items-center justify-between border-2 border-gray-200 bg-gray-50 rounded-xl p-2">
             <button
               type="button"
@@ -89,9 +89,9 @@ export default function CheckInView() {
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
+          {/* <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
             Mahatma Mobile
-          </label>
+          </label> */}
           <input
             type="text"
             inputMode="numeric" // Triggers the number pad on mobile phones
@@ -112,9 +112,9 @@ export default function CheckInView() {
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
+          {/* <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
             Mahatma Name
-          </label>
+          </label> */}
           <input
             type="text"
             value={name}
