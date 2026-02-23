@@ -35,10 +35,17 @@ export async function PUT(request) {
     const sql = neon(process.env.DATABASE_URL);
     const { id, action, newBagCount } = await request.json();
 
-    if (action === "RETURN") {
-      await sql`UPDATE checkins SET status = 'RETURNED' WHERE token_id = ${id}`;
-    } else if (action === "EDIT_BAGS") {
-      await sql`UPDATE checkins SET bag_count = ${newBagCount} WHERE token_id = ${id}`;
+    // if (action === "RETURN") {
+    //   await sql`UPDATE checkins SET status = 'RETURNED' WHERE token_id = ${id}`;
+    // } else if (action === "EDIT_BAGS") {
+    //   await sql`UPDATE checkins SET bag_count = ${newBagCount} WHERE token_id = ${id}`;
+    // }
+
+    // Inside your PUT function
+    if (action === "REQUEST_PICKUP") {
+      await sql`UPDATE checkins SET pickup_requested_at = NOW() WHERE token_id = ${id}`;
+    } else if (action === "FINAL_CHECKOUT") {
+      await sql`UPDATE checkins SET status = 'RETURNED', pickup_requested_at = NULL WHERE token_id = ${id}`;
     }
 
     return NextResponse.json({ success: true });
