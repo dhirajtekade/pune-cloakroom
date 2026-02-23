@@ -22,16 +22,16 @@ export default function CheckInView() {
       const data = await res.json();
 
       if (data.success) {
-        alert(`Success! Token #${data.tokenId} generated.`);
-        // Reset Form
+        // --- START PRINTING ---
+        printTokens(data.tokenId, name, mobile, bagCount);
+        // --- END PRINTING ---
+
         setName("");
         setMobile("");
         setBagCount(1);
-      } else {
-        alert("Error saving record.");
       }
     } catch (err) {
-      alert("Network error. Check connection.");
+      alert("Check connection.");
     } finally {
       setIsLoading(false);
     }
@@ -141,3 +141,35 @@ export default function CheckInView() {
     </div>
   );
 }
+
+const printTokens = (tokenId, name, mobile, bagCount) => {
+  // 1. Format the Mahatma Tag (The Master Receipt)
+  let printData = `
+--------------------------------
+      PUNE SEVA CLOAKROOM
+--------------------------------
+TOKEN ID: ${tokenId}
+NAME: ${name}
+MOBILE: ${mobile}
+TOTAL BAGS: ${bagCount}
+DATE: ${new Date().toLocaleDateString()}
+--------------------------------
+  PLEASE KEEP THIS TAG SAFE
+--------------------------------
+\n\n\n`;
+
+  // 2. Format the Bag Tags (One for each bag)
+  for (let i = 1; i <= bagCount; i++) {
+    printData += `
+--------------------------------
+    BAG TAG: ${i} / ${bagCount}
+--------------------------------
+      TOKEN: ${tokenId}
+--------------------------------
+\n\n\n`;
+  }
+
+  // 3. Send to RawBT Android App via Intent
+  const encodedData = encodeURIComponent(printData);
+  window.location.href = `intent:${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+};
