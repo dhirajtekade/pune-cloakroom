@@ -1,10 +1,12 @@
-export const runtime = 'edge';
+export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { sql } from "@neondatabase/serverless";
+import { neon } from "@neondatabase/serverless";
 
 // Fetch all records for the Records View
 export async function GET() {
   try {
+    const sql = neon(process.env.DATABASE_URL);
+
     const records = await sql`
       SELECT 
         token_id as id, 
@@ -30,6 +32,7 @@ export async function GET() {
 // Handle Check-Outs OR Bag Edits
 export async function PUT(request) {
   try {
+    const sql = neon(process.env.DATABASE_URL);
     const { id, action, newBagCount } = await request.json();
 
     if (action === "RETURN") {
