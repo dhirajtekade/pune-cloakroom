@@ -1,12 +1,15 @@
-export const runtime = 'edge';
+export const runtime = "edge";
 import { NextResponse } from "next/server";
-import { sql } from "@neondatabase/serverless";
+import { neon } from "@neondatabase/serverless";
 
 export async function POST(request) {
   try {
+    // 1. Initialize the connection using the neon function
+    const sql = neon(process.env.DATABASE_URL);
+
     const { mobile, name, bagCount } = await request.json();
 
-    // Insert into Postgres and immediately return the new token_id
+    // 2. Execute the query using the newly created 'sql' constant
     const result = await sql`
       INSERT INTO checkins (mobile, name, bag_count, status) 
       VALUES (${mobile}, ${name}, ${bagCount}, 'STORED')
@@ -18,9 +21,9 @@ export async function POST(request) {
       tokenId: result[0].token_id,
     });
   } catch (error) {
-    console.error("Check-in Error:", error);
+    console.error("Database Error:", error);
     return NextResponse.json(
-      { error: "Failed to save check-in" },
+      { error: "Failed to save record" },
       { status: 500 },
     );
   }
