@@ -1,86 +1,100 @@
-"use client";
-import { useState } from "react";
-import { PlusIcon, MinusIcon, PrinterIcon } from "@heroicons/react/24/solid";
+'use client';
+import { useState } from 'react';
+import { PlusIcon, MinusIcon, PrinterIcon } from '@heroicons/react/24/solid';
 
 export default function CheckInView() {
-  const [mobile, setMobile] = useState("");
-  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState('');
+  const [name, setName] = useState('');
   const [bagCount, setBagCount] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-
-  const adjustBags = (amount) => {
-    setBagCount((prev) => Math.max(1, prev + amount));
-  };
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    
+    try {
+      const res = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, name, bagCount }),
+      });
 
-    // Placeholder: We will add the database and RawBT logic here next
-    setTimeout(() => {
+      const data = await res.json();
+
+      if (data.success) {
+        alert(`Success! Token #${data.tokenId} generated.`);
+        // Reset Form
+        setName(''); setMobile(''); setBagCount(1);
+      } else {
+        alert("Error saving record.");
+      }
+    } catch (err) {
+      alert("Network error. Check connection.");
+    } finally {
       setIsLoading(false);
-      alert(`Ready to print ${bagCount + 1} labels for ${name}!`);
-      setName("");
-      setMobile("");
-      setBagCount(1);
-    }, 500);
+    }
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 max-w-md mx-auto border border-gray-100">
-      <h2 className="text-2xl font-black text-gray-800 mb-6 text-center">
-        New Visitor
-      </h2>
-
+      <h2 className="text-2xl font-black text-gray-800 mb-6 text-center text-blue-800">New Check-In</h2>
+      
       <form onSubmit={handleCheckIn} className="space-y-5">
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">
-            Mobile Number *
-          </label>
-          <input
-            type="tel"
+          <label className="block text-sm font-bold text-gray-700 mb-2 text-center">Bag Count</label>
+          <div className="flex items-center justify-between border-2 border-gray-200 bg-gray-50 rounded-xl p-2">
+            <button type="button" onClick={() => setBagCount(Math.max(1, bagCount - 1))} className="bg-white shadow-sm border border-gray-200 p-4 rounded-lg text-gray-700 active:bg-gray-100">
+              <MinusIcon className="h-7 w-7"/>
+            </button>
+            
+            <input 
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={bagCount}
+              onChange={(e) => setBagCount(parseInt(e.target.value) || 1)}
+              className="w-full text-center text-4xl font-black bg-transparent focus:outline-none"
+            />
+
+            <button type="button" onClick={() => setBagCount(bagCount + 1)} className="bg-blue-100 shadow-sm border border-blue-200 p-4 rounded-lg text-blue-700 active:bg-blue-200">
+              <PlusIcon className="h-7 w-7"/>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2 text-center">Mahatma Mobile</label>
+          <input 
+            type="tel" 
             value={mobile}
             onChange={(e) => setMobile(e.target.value)}
-            placeholder="e.g. 9876543210"
-            className="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-xl font-medium focus:border-blue-500 focus:bg-white focus:outline-none transition-colors"
+            placeholder="Mobile Number"
+            className="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-xl font-medium text-center focus:border-blue-500 focus:bg-white focus:outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">
-            Mahatma Name *
-          </label>
-          <input
-            type="text"
+          <label className="block text-sm font-bold text-gray-700 mb-2 text-center">Mahatma Name</label>
+          <input 
+            type="text" 
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Enter full name"
-            className="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-xl font-medium focus:border-blue-500 focus:bg-white focus:outline-none transition-colors"
+            placeholder="Name"
+            className="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-xl font-medium text-center focus:border-blue-500 focus:bg-white focus:outline-none"
             required
           />
         </div>
 
-        <input 
-  type="number" 
-  inputMode="numeric" // Forces the large number pad on mobile, not the full keyboard
-  pattern="[0-9]*"
-  value={bagCount}
-  onChange={(e) => setBagCount(parseInt(e.target.value) || '')}
-  className="w-full p-4 text-3xl font-black text-center border-2 border-gray-300 rounded-xl"
-/>
-
-        <button
-          type="submit"
+        <button 
+          type="submit" 
           disabled={isLoading}
           className={`w-full mt-4 p-5 rounded-xl text-xl font-bold text-white flex items-center justify-center space-x-2 transition-all shadow-md
-            ${isLoading ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 active:scale-[0.98]"}
+            ${isLoading ? 'bg-gray-400' : 'bg-green-600 active:scale-[0.98]'}
           `}
         >
           <PrinterIcon className="h-7 w-7" />
-          <span>
-            {isLoading ? "Saving..." : `Save & Print (${bagCount + 1})`}
-          </span>
+          <span>{isLoading ? 'Saving...' : `Save & Print (${bagCount + 1} Tags)`}</span>
         </button>
       </form>
     </div>
