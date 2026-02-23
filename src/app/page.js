@@ -14,7 +14,7 @@ export default function Home() {
     <main className="bg-gray-100 min-h-screen pb-20 font-sans">
       {/* Top Header */}
       <header className="bg-blue-800 text-white p-4 text-center shadow-md fixed top-0 w-full z-10">
-        <h1 className="text-xl font-bold tracking-wide">Pune Seva Cloakroom</h1>
+        <h1 className="text-xl font-bold tracking-wide">🧳 SamanGhar</h1>
       </header>
 
       {/* Main Content Area */}

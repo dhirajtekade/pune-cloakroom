@@ -155,7 +155,7 @@ const printTokens = (tokenId, name, mobile, bagCount) => {
 
   // 1. MAHATMA MASTER LABEL
   let mahatmaTag = `
-${CENTER}${BOLD_ON}PUNE SEVA CLOAKROOM${BOLD_OFF}
+${CENTER}${BOLD_ON}CLOAKROOM${BOLD_OFF}
 --------------------------------
 ${CENTER}MAHATMA COPY
 ${JUMBO}${tokenId}${NORMAL}
@@ -191,7 +191,7 @@ ${FEED}`;
 //   // 1. Format the Mahatma Tag (The Master Receipt)
 //   let printData = `
 // --------------------------------
-//       PUNE SEVA CLOAKROOM
+//       CLOAKROOM
 // --------------------------------
 // TOKEN ID: ${tokenId}
 // NAME: ${name}
