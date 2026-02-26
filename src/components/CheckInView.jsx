@@ -39,7 +39,7 @@ export default function CheckInView() {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 max-w-md mx-auto border border-gray-100">
       <h2 className="text-2xl font-black text-gray-800 mb-6 text-center text-blue-800">
-        New Check-In
+        New Check-In 1.0
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-5">
