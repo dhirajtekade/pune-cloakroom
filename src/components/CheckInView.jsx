@@ -22,9 +22,8 @@ export default function CheckInView() {
       const data = await res.json();
 
       if (data.success) {
-        // --- START PRINTING ---
+        // Trigger the updated label printing
         printTokens(data.tokenId, name, mobile, bagCount);
-        // --- END PRINTING ---
 
         setName("");
         setMobile("");
@@ -45,9 +44,6 @@ export default function CheckInView() {
 
       <form onSubmit={handleCheckIn} className="space-y-5">
         <div>
-          {/* <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
-            Bag Count
-          </label> */}
           <div className="flex items-center justify-between border-2 border-gray-200 bg-gray-50 rounded-xl p-2">
             <button
               type="button"
@@ -62,16 +58,12 @@ export default function CheckInView() {
               inputMode="numeric"
               pattern="[0-9]*"
               value={bagCount}
-              // This is the magic line: it selects the number on tap
               onFocus={(e) => e.target.select()}
               onClick={(e) => e.target.select()}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
-                // If the box is empty (user deleted everything), set it to empty string
-                // or 0 so they can type a fresh number easily
                 setBagCount(isNaN(val) ? "" : val);
               }}
-              // Ensure that if they leave the box empty, it resets to at least 1
               onBlur={() => {
                 if (bagCount === "" || bagCount < 1) setBagCount(1);
               }}
@@ -89,21 +81,14 @@ export default function CheckInView() {
         </div>
 
         <div>
-          {/* <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
-            Mahatma Mobile
-          </label> */}
           <input
             type="text"
-            inputMode="numeric" // Triggers the number pad on mobile phones
-            pattern="[0-9]*" // Extra hint for browsers
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={mobile}
             onChange={(e) => {
-              // This regex removes any character that is NOT a number
               const onlyNums = e.target.value.replace(/[^0-9]/g, "");
-              // Limit to 10 digits if needed
-              if (onlyNums.length <= 10) {
-                setMobile(onlyNums);
-              }
+              if (onlyNums.length <= 10) setMobile(onlyNums);
             }}
             placeholder="Enter 10-digit Mobile"
             className="w-full p-4 bg-white border-2 border-gray-200 rounded-xl text-xl font-bold text-center text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none"
@@ -112,9 +97,6 @@ export default function CheckInView() {
         </div>
 
         <div>
-          {/* <label className="block text-sm font-bold text-gray-700 mb-2 text-center">
-            Mahatma Name
-          </label> */}
           <input
             type="text"
             value={name}
@@ -143,78 +125,51 @@ export default function CheckInView() {
 }
 
 const printTokens = (tokenId, name, mobile, bagCount) => {
-  const ESC = "\x1B";
-  const GS = "\x1D";
-  const CENTER = ESC + "\x61\x01";
-  const LEFT = ESC + "\x61\x00";
-  const BOLD_ON = ESC + "\x45\x01";
-  const BOLD_OFF = ESC + "\x45\x00";
-  const JUMBO = ESC + "\x21\x30"; // Double height + Double width
-  const NORMAL = ESC + "\x21\x00";
-  const FEED = "\n\n\n";
+  const today = new Date().getDate();
 
-  // 1. MAHATMA MASTER LABEL
-  let mahatmaTag = `
-${CENTER}${BOLD_ON}CLOAKROOM${BOLD_OFF}
---------------------------------
-${CENTER}MAHATMA COPY
-${JUMBO}${tokenId}${NORMAL}
---------------------------------
-${LEFT}NAME: ${name.toUpperCase()}
-MOBILE: ${mobile}
-TOTAL BAGS: ${bagCount}
-TIME: ${new Date().toLocaleTimeString()}
---------------------------------
-${CENTER}Please show this for pickup
-${FEED}`;
+  // Format token to 4 digits (e.g., 0025)
+  const token4Digit = tokenId.toString().padStart(4, "0");
+  // const aliasQR = `pune26-13-${token4Digit}`;
+  const aliasQR = `pune26-${today}-${token4Digit}`;
 
-  // 2. INDIVIDUAL BAG LABELS
-  let bagTags = "";
-  for (let i = 1; i <= bagCount; i++) {
-    bagTags += `
-${CENTER}${BOLD_ON}BAG TAG${BOLD_OFF}
-${JUMBO}${tokenId}${NORMAL}
---------------------------------
-${CENTER}BAG: ${i} OF ${bagCount}
---------------------------------
-${FEED}`;
-  }
+  // HTML Content for the 3x2 inch labels (76mm x 50mm)
+  const printHTML = `
+    <div style="width: 76mm; font-family: sans-serif; text-align: center;">
+      
+      <div style="height: 48mm; padding: 2mm; box-sizing: border-box; overflow: hidden; page-break-after: always;">
+        <h3 style="margin: 0; font-size: 14px;">SAMANGHAR PUNE 2026</h3>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${aliasQR}" 
+             style="width: 28mm; height: 28mm; margin: 1mm 0;" />
+        <div style="display: flex; justify-content: space-around; align-items: center; font-weight: 900; font-size: 18px;">
+          <span>TOKEN: ${tokenId}</span>
+          <span>BAGS: ${bagCount}</span>
+        </div>
+        <div style="font-size: 10px; margin-top: 1mm;">${name.toUpperCase()}</div>
+      </div>
 
-  const fullPrint = mahatmaTag + bagTags;
+      ${Array.from({ length: bagCount })
+        .map(
+          (_, i) => `
+        <div style="height: 48mm; padding: 2mm; box-sizing: border-box; overflow: hidden; page-break-after: always; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-size: 85px; font-weight: 900; margin: 0; line-height: 1;">
+            ${tokenId} <span style="font-size: 30px;">(${i + 1}/${bagCount})</span>
+          </div>
+          <div style="font-size: 16px; font-weight: bold; margin-top: 5px; text-transform: uppercase;">
+             ${name}
+          </div>
+          <div style="font-size: 10px; border-top: 1px solid black; margin-top: 5px; padding-top: 2px;">
+            KEEP WITH LUGGAGE
+          </div>
+        </div>
+      `,
+        )
+        .join("")}
+    </div>
+  `;
 
-  // Encode and send to RawBT
-  const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
-  window.location.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+  // Base64 encode the HTML
+  const encodedData = btoa(unescape(encodeURIComponent(printHTML)));
+
+  // Send via Intent using content-type=text/html to trigger RawBT's silent rendering
+  window.location.href = `intent:#Intent;content-type=text/html;base64,${encodedData};scheme=rawbt;end;`;
 };
-
-// const printTokens = (tokenId, name, mobile, bagCount) => {
-//   // 1. Format the Mahatma Tag (The Master Receipt)
-//   let printData = `
-// --------------------------------
-//       CLOAKROOM
-// --------------------------------
-// TOKEN ID: ${tokenId}
-// NAME: ${name}
-// MOBILE: ${mobile}
-// TOTAL BAGS: ${bagCount}
-// DATE: ${new Date().toLocaleDateString()}
-// --------------------------------
-//   PLEASE KEEP THIS TAG SAFE
-// --------------------------------
-// \n\n\n`;
-
-//   // 2. Format the Bag Tags (One for each bag)
-//   for (let i = 1; i <= bagCount; i++) {
-//     printData += `
-// --------------------------------
-//     BAG TAG: ${i} / ${bagCount}
-// --------------------------------
-//       TOKEN: ${tokenId}
-// --------------------------------
-// \n\n\n`;
-//   }
-
-//   // 3. Send to RawBT Android App via Intent
-//   const encodedData = encodeURIComponent(printData);
-//   window.location.href = `intent:${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-// };
