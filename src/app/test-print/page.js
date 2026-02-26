@@ -93,7 +93,7 @@ export default function TestPrint() {
           onClick={() => handlePrint(888, 2, "John Doe")}
           className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
         >
-          PRINT 3 TEST LABELS
+          PRINT 3.0 TEST LABELS
         </button>
       </div>
 
