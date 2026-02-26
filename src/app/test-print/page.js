@@ -55,28 +55,62 @@ export default function TestPrint() {
   //   window.location.href = `intent:#Intent;content-type=text/plain;base64,${encoded};scheme=rawbt;end;`;
   // };
 
+  //   const handlePrint = (tokenId, bagCount, name) => {
+  //     // \x0C is the standard ESC/POS 'Form Feed' command for label printers
+  //     const FF = "\x0C";
+
+  //     // Design your label text
+  //     const labelText =
+  //       `SAMANGHAR - PUNE\n` +
+  //       `TOKEN: #${tokenId}\n` +
+  //       `BAG: ${bagCount} BAGS\n` +
+  //       `----------------\n` + // A simple separator line
+  //       FF +
+  //       `BAG TAG\n` +
+  //       `TOKEN: #${tokenId}\n` +
+  //       `DO NOT LOSE\n` +
+  //       FF;
+
+  //     // 1. Encode the text to Base64
+  //     const encoded = btoa(unescape(encodeURIComponent(labelText)));
+
+  //     // 2. Redirect to the RawBT Intent
+  //     // 'text/plain' tells RawBT to treat this as standard printer text commands
+  //     window.location.href = `intent:#Intent;content-type=text/plain;base64,${encoded};scheme=rawbt;end;`;
+  //   };
+
   const handlePrint = (tokenId, bagCount, name) => {
-    // \x0C is the standard ESC/POS 'Form Feed' command for label printers
+    console.log("Print button clicked for Token:", tokenId);
+
+    // \x0C is the Form Feed command
     const FF = "\x0C";
 
-    // Design your label text
     const labelText =
       `SAMANGHAR - PUNE\n` +
       `TOKEN: #${tokenId}\n` +
-      `BAG: ${bagCount} BAGS\n` +
-      `----------------\n` + // A simple separator line
+      `NAME: ${name}\n` +
+      `BAGS: ${bagCount}\n` +
       FF +
       `BAG TAG\n` +
       `TOKEN: #${tokenId}\n` +
-      `DO NOT LOSE\n` +
       FF;
 
-    // 1. Encode the text to Base64
-    const encoded = btoa(unescape(encodeURIComponent(labelText)));
+    try {
+      // 1. Properly encode for UTF-8 and Base64
+      const base64 = btoa(unescape(encodeURIComponent(labelText)));
 
-    // 2. Redirect to the RawBT Intent
-    // 'text/plain' tells RawBT to treat this as standard printer text commands
-    window.location.href = `intent:#Intent;content-type=text/plain;base64,${encoded};scheme=rawbt;end;`;
+      // 2. Construct the Intent URL
+      const intentUrl = `intent:#Intent;content-type=text/plain;base64,${base64};scheme=rawbt;end;`;
+
+      // 3. Trigger the redirect
+      window.location.href = intentUrl;
+      alert("after intentURL");
+      alert(intentUrl);
+    } catch (err) {
+        alert("Err");
+      console.error("Print Error:", err);
+      alert("Printing failed. Make sure RawBT is installed.");
+    }
   };
 
   return (
