@@ -197,6 +197,34 @@ export default function TestPrint() {
     }
   };
 
+  const discoverPrinterServices = async () => {
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "P80H" }],
+        // This tells Chrome to look for EVERY possible service
+        optionalServices: [
+          "00001101-0000-1000-8000-00805f9b34fb", // Standard SPP
+          "00004953-5343-fe7d-4058-64724665396b", // Common alternative
+          "e7810a71-73ae-499d-8c15-faa9aef0c3f2", // Another common one
+        ],
+        acceptAllDevices: false,
+      });
+
+      const server = await device.gatt.connect();
+      const services = await server.getPrimaryServices();
+
+      let serviceInfo = "Found Services:\n";
+      services.forEach((s) => {
+        serviceInfo += `- ${s.uuid}\n`;
+      });
+
+      alert(serviceInfo);
+      console.log(services);
+    } catch (err) {
+      alert("Discovery Error: " + err.message);
+    }
+  };
+
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
       <div className="max-w-md mx-auto no-print">
@@ -215,7 +243,8 @@ export default function TestPrint() {
         </button>
 
         <button
-          onClick={() => printDirectly(888, 2)}
+          //   onClick={() => printDirectly(888, 2)}
+          onClick={discoverPrinterServices}
           className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
         >
           PRINT 4.0 TEST LABELS -update1
