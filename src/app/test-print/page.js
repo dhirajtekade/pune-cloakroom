@@ -284,10 +284,10 @@ export default function TestPrint() {
 
         <button
           //   onClick={() => printDirectly(888, 2)}
-          onClick={discoverPrinterServices}
+          onClick={() => printDirectly(888, 2, "John Doe")}
           className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
         >
-          PRINT 4.0 TEST LABELS -update2
+          PRINT 4.0 TEST LABELS -update3
         </button>
 
         <a
