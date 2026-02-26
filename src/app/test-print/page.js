@@ -265,6 +265,51 @@ export default function TestPrint() {
     }
   };
 
+  // Store these at the top of your component or in a UseRef
+  let printerCharacteristic = null;
+
+  const connectAndPrint = async (tokenId, bags, name) => {
+    try {
+      // 1. Check if we already have an active connection
+      if (
+        printerCharacteristic &&
+        printerCharacteristic.service.device.gatt.connected
+      ) {
+        await sendDataToPrinter(printerCharacteristic, tokenId, bags, name);
+        return;
+      }
+
+      // 2. If not connected, show the pairing popup once
+      const SERVICE_UUID = "e7810a71-73ae-499d-8c15-faa9aef0c3f2";
+      const CHARACTERISTIC_UUID = "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f";
+
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "P80H" }],
+        optionalServices: [SERVICE_UUID],
+      });
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      printerCharacteristic =
+        await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      // 3. Print the first label
+      await sendDataToPrinter(printerCharacteristic, tokenId, bags, name);
+    } catch (err) {
+      console.error("BT Error:", err);
+      alert("Connect your P80H printer first.");
+    }
+  };
+
+  const sendDataToPrinter = async (characteristic, tokenId, bags, name) => {
+    const encoder = new TextEncoder();
+    const FF = "\x0C"; // Form Feed for your 3x2 labels
+    const data = encoder.encode(
+      `TOKEN: #${tokenId}\nBAGS: ${bags}\nNAME: ${name}\n` + FF,
+    );
+    await characteristic.writeValue(data);
+  };
+
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
       <div className="max-w-md mx-auto no-print">
@@ -284,10 +329,10 @@ export default function TestPrint() {
 
         <button
           //   onClick={() => printDirectly(888, 2)}
-          onClick={() => printDirectly(888, 2, "John Doe")}
+          onClick={() => connectAndPrint(888, 2, "John Doe")}
           className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
         >
-          PRINT 4.0 TEST LABELS -update3
+          PRINT 4.0 TEST LABELS -update4
         </button>
 
         <a
