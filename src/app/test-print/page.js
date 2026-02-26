@@ -136,6 +136,34 @@ export default function TestPrint() {
     }
   };
 
+  const printDirectly = async (tokenId, bags) => {
+    try {
+      // 1. Request the printer
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "P80H" }],
+        optionalServices: ["00001101-0000-1000-8000-00805f9b34fb"], // Standard SPP UUID
+      });
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(
+        "00001101-0000-1000-8000-00805f9b34fb",
+      );
+      const characteristic = await service.getCharacteristic(
+        "00001101-0000-1000-8000-00805f9b34fb",
+      );
+
+      // 2. Prepare ESC/POS commands
+      const encoder = new TextEncoder();
+      const FF = "\x0C"; // Form Feed for your 3x2 labels
+      const data = encoder.encode(`TOKEN: #${tokenId}\nBAGS: ${bags}\n` + FF);
+
+      // 3. Send to printer
+      await characteristic.writeValue(data);
+    } catch (err) {
+      console.error("Bluetooth Print Error:", err);
+    }
+  };
+
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
       <div className="max-w-md mx-auto no-print">
@@ -151,6 +179,13 @@ export default function TestPrint() {
           className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
         >
           PRINT 3.0 TEST LABELS
+        </button>
+
+        <button
+          onClick={() => printDirectly(888, 2)}
+          className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
+        >
+          PRINT 4.0 TEST LABELS
         </button>
 
         <a
