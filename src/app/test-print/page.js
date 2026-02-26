@@ -164,38 +164,38 @@ export default function TestPrint() {
   //     }
   //   };
 
-  const printDirectly = async (tokenId, bags) => {
-    try {
-      // 1. Filter specifically for your printer name
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: "P80H" }],
-        // Use the generic 16-bit Serial Port service ID
-        optionalServices: [0xffe0, "00001101-0000-1000-8000-00805f9b34fb"],
-      });
+  //   const printDirectly = async (tokenId, bags) => {
+  //     try {
+  //       // 1. Filter specifically for your printer name
+  //       const device = await navigator.bluetooth.requestDevice({
+  //         filters: [{ namePrefix: "P80H" }],
+  //         // Use the generic 16-bit Serial Port service ID
+  //         optionalServices: [0xffe0, "00001101-0000-1000-8000-00805f9b34fb"],
+  //       });
 
-      const server = await device.gatt.connect();
+  //       const server = await device.gatt.connect();
 
-      // 2. Try to find the primary service (FFE0 is standard for these printers)
-      const service = await server.getPrimaryService(0xffe0);
-      const characteristic = await service.getCharacteristic(0xffe1);
+  //       // 2. Try to find the primary service (FFE0 is standard for these printers)
+  //       const service = await server.getPrimaryService(0xffe0);
+  //       const characteristic = await service.getCharacteristic(0xffe1);
 
-      // 3. Prepare the ESC/POS commands
-      const encoder = new TextEncoder();
-      const FF = "\x0C"; // Form Feed for gaps
-      const GS = "\x1D"; // Group Separator for formatting
+  //       // 3. Prepare the ESC/POS commands
+  //       const encoder = new TextEncoder();
+  //       const FF = "\x0C"; // Form Feed for gaps
+  //       const GS = "\x1D"; // Group Separator for formatting
 
-      // Let's send a very simple test first to ensure it works
-      const testData = encoder.encode(
-        `SAMANGHAR PUNE\n` + `TOKEN: #${tokenId}\n` + `BAGS: ${bags}\n` + FF,
-      );
+  //       // Let's send a very simple test first to ensure it works
+  //       const testData = encoder.encode(
+  //         `SAMANGHAR PUNE\n` + `TOKEN: #${tokenId}\n` + `BAGS: ${bags}\n` + FF,
+  //       );
 
-      await characteristic.writeValue(testData);
-      console.log("Print Successful!");
-    } catch (err) {
-      console.error("Bluetooth Error Details:", err);
-      alert("Connection Error: " + err.message);
-    }
-  };
+  //       await characteristic.writeValue(testData);
+  //       console.log("Print Successful!");
+  //     } catch (err) {
+  //       console.error("Bluetooth Error Details:", err);
+  //       alert("Connection Error: " + err.message);
+  //     }
+  //   };
 
   const discoverPrinterServices = async () => {
     try {
@@ -222,6 +222,46 @@ export default function TestPrint() {
       console.log(services);
     } catch (err) {
       alert("Discovery Error: " + err.message);
+    }
+  };
+
+  const printDirectly = async (tokenId, bags, name) => {
+    try {
+      const SERVICE_UUID = "e7810a71-73ae-499d-8c15-faa9aef0c3f2";
+      const CHARACTERISTIC_UUID = "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f";
+
+      // 1. Connect to the P80H
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "P80H" }],
+        optionalServices: [SERVICE_UUID],
+      });
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      const characteristic =
+        await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+      // 2. Prepare ESC/POS Commands
+      const encoder = new TextEncoder();
+      const FF = "\x0C"; // Form Feed triggers your 2-inch gap sensor
+
+      // Using uppercase for better thermal print clarity
+      const data = encoder.encode(
+        `SAMANGHAR PUNE 2026\n` +
+          `-------------------\n` +
+          `TOKEN: #${tokenId}\n` +
+          `NAME: ${name.toUpperCase()}\n` +
+          `BAGS: ${bags}\n` +
+          `-------------------\n` +
+          FF,
+      );
+
+      // 3. Write to printer
+      await characteristic.writeValue(data);
+      console.log("Print Job Sent Successfully!");
+    } catch (err) {
+      console.error("BT Print Error:", err);
+      alert("Connection Error: " + err.message);
     }
   };
 
