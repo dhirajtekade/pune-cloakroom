@@ -136,31 +136,64 @@ export default function TestPrint() {
     }
   };
 
+  //   const printDirectly = async (tokenId, bags) => {
+  //     try {
+  //       // 1. Request the printer
+  //       const device = await navigator.bluetooth.requestDevice({
+  //         filters: [{ namePrefix: "P80H" }],
+  //         optionalServices: ["00001101-0000-1000-8000-00805f9b34fb"], // Standard SPP UUID
+  //       });
+
+  //       const server = await device.gatt.connect();
+  //       const service = await server.getPrimaryService(
+  //         "00001101-0000-1000-8000-00805f9b34fb",
+  //       );
+  //       const characteristic = await service.getCharacteristic(
+  //         "00001101-0000-1000-8000-00805f9b34fb",
+  //       );
+
+  //       // 2. Prepare ESC/POS commands
+  //       const encoder = new TextEncoder();
+  //       const FF = "\x0C"; // Form Feed for your 3x2 labels
+  //       const data = encoder.encode(`TOKEN: #${tokenId}\nBAGS: ${bags}\n` + FF);
+
+  //       // 3. Send to printer
+  //       await characteristic.writeValue(data);
+  //     } catch (err) {
+  //       console.error("Bluetooth Print Error:", err);
+  //     }
+  //   };
+
   const printDirectly = async (tokenId, bags) => {
     try {
-      // 1. Request the printer
+      // 1. Filter specifically for your printer name
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: "P80H" }],
-        optionalServices: ["00001101-0000-1000-8000-00805f9b34fb"], // Standard SPP UUID
+        // Use the generic 16-bit Serial Port service ID
+        optionalServices: [0xffe0, "00001101-0000-1000-8000-00805f9b34fb"],
       });
 
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(
-        "00001101-0000-1000-8000-00805f9b34fb",
-      );
-      const characteristic = await service.getCharacteristic(
-        "00001101-0000-1000-8000-00805f9b34fb",
-      );
 
-      // 2. Prepare ESC/POS commands
+      // 2. Try to find the primary service (FFE0 is standard for these printers)
+      const service = await server.getPrimaryService(0xffe0);
+      const characteristic = await service.getCharacteristic(0xffe1);
+
+      // 3. Prepare the ESC/POS commands
       const encoder = new TextEncoder();
-      const FF = "\x0C"; // Form Feed for your 3x2 labels
-      const data = encoder.encode(`TOKEN: #${tokenId}\nBAGS: ${bags}\n` + FF);
+      const FF = "\x0C"; // Form Feed for gaps
+      const GS = "\x1D"; // Group Separator for formatting
 
-      // 3. Send to printer
-      await characteristic.writeValue(data);
+      // Let's send a very simple test first to ensure it works
+      const testData = encoder.encode(
+        `SAMANGHAR PUNE\n` + `TOKEN: #${tokenId}\n` + `BAGS: ${bags}\n` + FF,
+      );
+
+      await characteristic.writeValue(testData);
+      console.log("Print Successful!");
     } catch (err) {
-      console.error("Bluetooth Print Error:", err);
+      console.error("Bluetooth Error Details:", err);
+      alert("Connection Error: " + err.message);
     }
   };
 
