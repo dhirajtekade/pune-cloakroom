@@ -218,7 +218,7 @@ export default function TestPrint() {
           onClick={() => printDirectly(888, 2)}
           className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all"
         >
-          PRINT 4.0 TEST LABELS
+          PRINT 4.0 TEST LABELS -update1
         </button>
 
         <a
