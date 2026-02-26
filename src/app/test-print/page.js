@@ -79,12 +79,42 @@ export default function TestPrint() {
   //     window.location.href = `intent:#Intent;content-type=text/plain;base64,${encoded};scheme=rawbt;end;`;
   //   };
 
+  //   const handlePrint = (tokenId, bagCount, name) => {
+  //     console.log("Print button clicked for Token:", tokenId);
+
+  //     // \x0C is the Form Feed command
+  //     const FF = "\x0C";
+
+  //     const labelText =
+  //       `SAMANGHAR - PUNE\n` +
+  //       `TOKEN: #${tokenId}\n` +
+  //       `NAME: ${name}\n` +
+  //       `BAGS: ${bagCount}\n` +
+  //       FF +
+  //       `BAG TAG\n` +
+  //       `TOKEN: #${tokenId}\n` +
+  //       FF;
+
+  //     try {
+  //       // 1. Properly encode for UTF-8 and Base64
+  //       const base64 = btoa(unescape(encodeURIComponent(labelText)));
+
+  //       // 2. Construct the Intent URL
+  //       const intentUrl = `intent:#Intent;content-type=text/plain;base64,${base64};scheme=rawbt;end;`;
+
+  //       // 3. Trigger the redirect
+  //       window.location.href = intentUrl;
+  //       alert("after intentURL");
+  //       alert(intentUrl);
+  //     } catch (err) {
+  //         alert("Err");
+  //       console.error("Print Error:", err);
+  //       alert("Printing failed. Make sure RawBT is installed.");
+  //     }
+  //   };
+
   const handlePrint = (tokenId, bagCount, name) => {
-    console.log("Print button clicked for Token:", tokenId);
-
-    // \x0C is the Form Feed command
     const FF = "\x0C";
-
     const labelText =
       `SAMANGHAR - PUNE\n` +
       `TOKEN: #${tokenId}\n` +
@@ -96,20 +126,13 @@ export default function TestPrint() {
       FF;
 
     try {
-      // 1. Properly encode for UTF-8 and Base64
       const base64 = btoa(unescape(encodeURIComponent(labelText)));
-
-      // 2. Construct the Intent URL
       const intentUrl = `intent:#Intent;content-type=text/plain;base64,${base64};scheme=rawbt;end;`;
 
-      // 3. Trigger the redirect
-      window.location.href = intentUrl;
-      alert("after intentURL");
-      alert(intentUrl);
+      // DO NOT use alert() here. It blocks the "User Gesture" required for Intents.
+      window.location.assign(intentUrl);
     } catch (err) {
-        alert("Err");
       console.error("Print Error:", err);
-      alert("Printing failed. Make sure RawBT is installed.");
     }
   };
 
@@ -129,6 +152,13 @@ export default function TestPrint() {
         >
           PRINT 3.0 TEST LABELS
         </button>
+
+        <a
+          href={`intent:#Intent;content-type=text/plain;base64,${btoa("TOKEN #888" + "\x0C")};scheme=rawbt;end;`}
+          className="block text-center bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg"
+        >
+          LAUNCH RAWBT PRINT
+        </a>
       </div>
 
       {/* --- PRINTABLE AREA --- */}
