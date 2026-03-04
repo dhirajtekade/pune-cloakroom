@@ -11,7 +11,8 @@ export async function GET() {
       SELECT 
         token_id as id, 
         name, 
-        mobile, 
+        mobile,
+        city,
         bag_count as bags, 
         status, 
         to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'HH:MI AM') as time 

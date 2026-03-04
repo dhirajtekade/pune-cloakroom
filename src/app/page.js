@@ -23,7 +23,7 @@ export default function Home() {
       </div>
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around p-2 shadow-[0_-5px_10px_rgba(0,0,0,0.05)] z-10">
+      {/* <nav className="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around p-2 shadow-[0_-5px_10px_rgba(0,0,0,0.05)] z-10">
         <button
           onClick={() => setActiveTab("checkin")}
           className={`flex flex-col items-center p-2 w-full rounded-xl transition-colors ${activeTab === "checkin" ? "text-blue-700 bg-blue-50" : "text-gray-500"}`}
@@ -39,7 +39,7 @@ export default function Home() {
           <ClipboardDocumentListIcon className="h-7 w-7" />
           <span className="text-xs font-bold mt-1">Records</span>
         </button>
-      </nav>
+      </nav> */}
     </main>
   );
 }

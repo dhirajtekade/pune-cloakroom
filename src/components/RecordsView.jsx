@@ -4,13 +4,16 @@ import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  clockIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 
 export default function RecordsView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Add this line to fix the crash
+  const isAdmin = true; // Set to true for now so you can see the delete buttons
 
   const fetchRecords = async () => {
     setLoading(true);

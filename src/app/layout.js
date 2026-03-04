@@ -7,6 +7,7 @@ import {
   PlusIcon,
   ClipboardDocumentListIcon,
   QrCodeIcon,
+  Cog8ToothIcon,
 } from "@heroicons/react/24/outline";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -41,9 +42,17 @@ export default async function RootLayout({ children }) {
                   SAMANGHAR
                 </h1>
                 {isAdmin && (
-                  <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
-                    Admin
-                  </span>
+                  <>
+                    <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                      Admin
+                    </span>
+                    <Link
+                      href="/admin/settings"
+                      className="p-4 bg-gray-800 rounded-full shadow-lg border border-gray-700 hover:bg-gray-700 transition-all"
+                    >
+                      <Cog8ToothIcon className="h-6 w-6 text-gray-400" />
+                    </Link>
+                  </>
                 )}
               </div>
 
