@@ -1,6 +1,13 @@
 "use client";
 import { useState } from "react";
-import { PlusIcon, MinusIcon, PrinterIcon } from "@heroicons/react/24/solid";
+import {
+  PlusIcon,
+  MinusIcon,
+  PrinterIcon,
+  CheckCircleIcon,
+  ChatBubbleLeftRightIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/solid";
 
 export default function CheckInView() {
   const [mobile, setMobile] = useState("");
@@ -8,33 +15,153 @@ export default function CheckInView() {
   const [city, setCity] = useState("");
   const [bagCount, setBagCount] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [successData, setSuccessData] = useState(null);
+  const [isResending, setIsResending] = useState(false);
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
-      const res = await fetch("/api/checkin", {
+      const response = await fetch("/api/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mobile, name, city: city || "N/A", bagCount }), // Fallback for DB
+        body: JSON.stringify({ mobile, name, city: city || "N/A", bagCount }),
       });
-
-      const data = await res.json();
+      const data = await response.json();
 
       if (data.success) {
-        printTokens(data.tokenId, name, mobile, city, bagCount);
-        setName("");
-        setMobile("");
-        setCity("");
-        setBagCount(1);
+        // Trigger Printer (Only works on Android with RawBT)
+        // try {
+        //   printTokens(data.tokenId, name, mobile, city, bagCount, data.mode);
+        // } catch (err) {
+        //   console.log("Printing skipped: Likely on Desktop");
+        // }
+
+        setSuccessData({
+          tokenId: data.tokenId,
+          name: name, // Make sure this isn't empty
+          mobile: mobile, // Make sure this isn't empty
+          bagCount: bagCount,
+        });
+
+        setSuccessData({ tokenId: data.tokenId, name, mobile, bagCount });
+      } else {
+        alert("Error: " + data.error);
       }
     } catch (err) {
-      alert("Check connection.");
+      alert("Check connection / Server error.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const resendSMS = async () => {
+    if (!successData) return;
+    setIsResending(true);
+
+    try {
+      const res = await fetch("/api/checkin/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mobile: successData.mobile,
+          tokenId: successData.tokenId,
+          name: successData.name,
+          bagCount: successData.bagCount,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert("SMS Sent Successfully!");
+      } else {
+        alert("Failed to send: " + data.error);
+      }
+    } catch (err) {
+      alert("Check connection.");
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const shareToWhatsApp = () => {
+    if (!successData) return;
+
+    // 1. Format the token correctly
+    const { tokenId, name, mobile, bagCount } = successData;
+    const tokenStr = `#${String(tokenId).padStart(4, "0")}`;
+
+    // 2. Build the message string
+    const messageText =
+      `*SAMAN GHAR PUNE*\n` +
+      `Jai Satchitanand!\n\n` +
+      `Token: *${tokenStr}*\n` +
+      `Name: *${name.toUpperCase()}*\n` +
+      `Bags: *${bagCount}*\n\n` +
+      `Please show this message to collect your bags.`;
+
+    // 3. ENCODE the entire message for the URL
+    const encodedText = encodeURIComponent(messageText);
+
+    // 4. Open WhatsApp
+    window.open(`https://wa.me/91${mobile}?text=${encodedText}`, "_blank");
+  };
+
+  const resetForm = () => {
+    setSuccessData(null);
+    setName("");
+    setMobile("");
+    setCity("");
+    setBagCount(1);
+  };
+
+  if (successData) {
+    return (
+      <div className="bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md mx-auto border-2 border-green-500/50 text-center">
+        <div className="flex justify-center mb-4">
+          <CheckCircleIcon className="h-16 w-16 text-green-500" />
+        </div>
+        <h2 className="text-3xl font-black text-white mb-2 uppercase">
+          Checked In!
+        </h2>
+        <p className="text-gray-400 mb-6 font-bold tracking-widest text-xl text-blue-400">
+          TOKEN: #{String(successData.tokenId).padStart(4, "0")}
+        </p>
+
+        <div className="space-y-4">
+          <button
+            onClick={shareToWhatsApp}
+            className="w-full p-5 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+          >
+            <ChatBubbleLeftRightIcon className="h-7 w-7" />
+            SHARE ON WHATSAPP
+          </button>
+
+          {/* NEW RESEND SMS BUTTON */}
+          <button
+            onClick={resendSMS}
+            disabled={isResending}
+            className={`w-full p-4 rounded-2xl font-bold flex items-center justify-center gap-3 border-2 transition-all ${
+              isResending
+                ? "bg-gray-800 border-gray-700 text-gray-500"
+                : "bg-blue-600/10 border-blue-600 text-blue-400 hover:bg-blue-600/20"
+            }`}
+          >
+            <ChatBubbleLeftRightIcon className="h-5 w-5" />
+            {isResending ? "SENDING..." : "RESEND SMS"}
+          </button>
+
+          <button
+            onClick={resetForm}
+            className="w-full p-5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-2xl font-bold flex items-center justify-center gap-3"
+          >
+            <ArrowPathIcon className="h-5 w-5" />
+            NEXT MAHATMA
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
@@ -43,37 +170,24 @@ export default function CheckInView() {
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
-        {/* Bag Counter Section */}
         <div className="flex items-center justify-between border-2 border-gray-700 bg-gray-800 rounded-xl p-2">
           <button
             type="button"
             onClick={() => setBagCount(Math.max(1, bagCount - 1))}
-            className="bg-gray-700 shadow-sm border border-gray-600 p-4 rounded-lg text-white active:bg-gray-600"
+            className="bg-gray-700 p-4 rounded-lg text-white"
           >
             <MinusIcon className="h-7 w-7" />
           </button>
-
           <input
             type="number"
-            inputMode="numeric"
-            pattern="[0-9]*"
             value={bagCount}
-            onFocus={(e) => e.target.select()}
-            onClick={(e) => e.target.select()}
-            onChange={(e) => {
-              const val = parseInt(e.target.value);
-              setBagCount(isNaN(val) ? "" : val);
-            }}
-            onBlur={() => {
-              if (bagCount === "" || bagCount < 1) setBagCount(1);
-            }}
+            readOnly
             className="w-full text-center text-4xl font-black bg-transparent text-white focus:outline-none"
           />
-
           <button
             type="button"
             onClick={() => setBagCount(bagCount + 1)}
-            className="bg-blue-600 shadow-sm border border-blue-500 p-4 rounded-lg text-white active:bg-blue-500"
+            className="bg-blue-600 p-4 rounded-lg text-white"
           >
             <PlusIcon className="h-7 w-7" />
           </button>
@@ -88,48 +202,40 @@ export default function CheckInView() {
               setMobile(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))
             }
             placeholder="Mobile Number"
-            className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white placeholder:text-gray-500 focus:border-blue-500 outline-none transition-colors"
+            className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white outline-none"
             required
           />
-
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Mahatma Name"
-            className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white placeholder:text-gray-500 focus:border-blue-500 outline-none transition-colors"
+            className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white outline-none"
             required
           />
-
-          {/* City Field: REMOVED 'required' */}
           <input
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
             placeholder="City / Village (Optional)"
-            className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white placeholder:text-gray-500 focus:border-blue-500 outline-none transition-colors"
+            className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white outline-none"
           />
         </div>
 
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-full mt-4 p-5 rounded-xl text-xl font-bold text-white flex items-center justify-center space-x-2 shadow-lg ${
-            isLoading
-              ? "bg-gray-400"
-              : "bg-green-600 hover:bg-green-500 active:scale-95 transition-all"
-          }`}
+          className={`w-full mt-4 p-5 rounded-xl text-xl font-bold text-white flex items-center justify-center space-x-2 ${isLoading ? "bg-gray-400" : "bg-green-600"}`}
         >
           <PrinterIcon className="h-7 w-7" />
-          <span>
-            {isLoading ? "Saving..." : `Print ${bagCount + 1} Labels`}
-          </span>
+          <span>{isLoading ? "Saving..." : `Print ${bagCount} Labels`}</span>
         </button>
       </form>
     </div>
   );
 }
 
+// Ensure printTokens is defined globally or inside the same file
 const printTokens = (
   startTokenId,
   name,
@@ -144,73 +250,14 @@ const printTokens = (
   let fullPrint = "";
 
   for (let i = 0; i < bagCount; i++) {
-    // DYNAMIC CALCULATION:
-    // If PER_BAG, add 'i' to the ID. If PER_MAHATMA, keep ID same.
     let currentToken =
       mode === "PER_BAG" ? Number(startTokenId) + i : startTokenId;
     let subtitle =
       mode === "PER_BAG"
         ? `BAG ${i + 1} OF ${bagCount}`
         : `TAG ${i + 1}/${bagCount}`;
-
-    fullPrint +=
-      `\x1Ba\x01\x1BE\x01PUNE CLOAKROOM 2026\x1BE\x00\n` +
-      `--------------------------------\n` +
-      `${JUMBO}TOKEN: ${currentToken}${NORMAL}\n` +
-      `--------------------------------\n` +
-      `${subtitle}\n` +
-      `${name.toUpperCase()}\n` +
-      `${city ? city.toUpperCase() : ""}\n` +
-      `KEEP WITH LUGGAGE\n` +
-      FF;
+    fullPrint += `\x1Ba\x01\x1BE\x01PUNE CLOAKROOM 2026\x1BE\x00\n--------------------------------\n${JUMBO}TOKEN: ${currentToken}${NORMAL}\n--------------------------------\n${subtitle}\n${name.toUpperCase()}\n${city ? city.toUpperCase() : ""}\nKEEP WITH LUGGAGE\n${FF}`;
   }
-
-  const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
-  window.location.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-};
-
-const printTokens2 = (tokenId, name, mobile, bagCount) => {
-  const today = new Date().getDate();
-  const token4Digit = tokenId.toString().padStart(4, "0");
-  const aliasQR = `pune26-${today}-${token4Digit}`;
-
-  // ESC/POS Commands (Hardware native language)
-  const ESC = "\x1B";
-  const GS = "\x1D";
-  const CENTER = ESC + "\x61\x01";
-  const LEFT = ESC + "\x61\x00";
-  const BOLD_ON = ESC + "\x45\x01";
-  const BOLD_OFF = ESC + "\x45\x00";
-  const JUMBO = ESC + "\x21\x30"; // Double Height + Double Width
-  const NORMAL = ESC + "\x21\x00";
-  const FF = "\x0C"; // Form Feed triggers your gap sensor
-
-  // 1. MAHATMA MASTER LABEL
-  let mahatmaTag =
-    `${CENTER}${BOLD_ON}SAMANGHAR PUNE 2026${BOLD_OFF}\n` +
-    `--------------------------------\n` +
-    `QR: ${aliasQR}\n` + // Text version for safety
-    `${JUMBO}TOKEN: ${tokenId}${NORMAL}\n` +
-    `BAGS: ${bagCount}\n` +
-    `NAME: ${name.toUpperCase()}\n` +
-    `--------------------------------\n` +
-    FF;
-
-  // 2. INDIVIDUAL BAG LABELS
-  let bagTags = "";
-  for (let i = 1; i <= bagCount; i++) {
-    bagTags +=
-      `${CENTER}${BOLD_ON}BAG TAG${BOLD_OFF}\n` +
-      `${JUMBO}${tokenId}${NORMAL}\n` +
-      `--------------------------------\n` +
-      `BAG: ${i} OF ${bagCount}\n` +
-      `${name.toUpperCase()}\n` +
-      FF;
-  }
-
-  const fullPrint = mahatmaTag + bagTags;
-
-  // Use the exact Intent format from your "Working" code
   const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
   window.location.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
 };
