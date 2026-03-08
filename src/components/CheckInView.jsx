@@ -267,44 +267,41 @@ const printTokens = (
   mode = "PER_MAHATMA",
   printBagLabels = true,
 ) => {
-  // ESC/POS Sizing and Styling Commands
-  const JUMBO = "\x1B\x21\x30"; // Double Height & Double Width (Huge)
+  // ESC/POS Commands
+  const HUGE_BOLD = "\x1D\x21\x11\x1BE\x01"; // Double Width + Double Height + Bold
   const LARGE = "\x1B\x21\x10"; // Double Height (Tall)
-  const NORMAL = "\x1B\x21\x00"; // Standard size
-  const BOLD_ON = "\x1BE\x01";
-  const BOLD_OFF = "\x1BE\x00";
+  const NORMAL = "\x1B\x21\x00\x1BE\x00"; // Reset to Normal + Bold OFF
   const CENTER = "\x1Ba\x01";
-  const FF = "\x0C"; // Form Feed (Ejects exactly to the next 50mm label gap)
+  const FF = "\x0C";
 
   const todayDate = new Date().getDate();
   let fullPrint = "";
 
-  // The very first token ID format for this check-in (e.g., "8-0093")
-  const firstTokenNum = Number(startTokenId);
-  const displayToken = `${todayDate}-${String(firstTokenNum).padStart(4, "0")}`;
+  // CLEAN TOKEN: Remove the "8-" and just keep "0051"
+  const cleanToken = String(startTokenId).padStart(4, "0");
 
-  // ==========================================
-  // MODE 1: TOKEN PER MAHATMA (Cluster Mode)
-  // ==========================================
   if (mode === "PER_MAHATMA") {
-    // --- A. PRINT THE MASTER MAHATMA TOKEN ---
+    // --- A. MASTER MAHATMA TOKEN ---
     fullPrint +=
-      `${CENTER}${BOLD_ON}PUNE CLOAKROOM 2026${BOLD_OFF}\n` +
+      `${CENTER}${NORMAL}PUNE CLOAKROOM 2026\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
-      `${JUMBO}${displayToken}${NORMAL}\n` +
-      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
+      `${HUGE_BOLD}${cleanToken}${NORMAL}\n\n` + // Massive Bold Token
+      `\x1BE\x01${bagCount} Bags - ${name.toUpperCase()}\x1BE\x00\n` +
       `--------------------------------\n` +
       `KEEP THIS SLIP SAFE\n` +
       `${FF}`;
 
-    // --- B. PRINT INDIVIDUAL BAG LABELS ---
+    // --- B. INDIVIDUAL BAG LABELS ---
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          `${CENTER}\n\n` +
-          `${JUMBO}${displayToken} ${LARGE}(${i}/${bagCount})${NORMAL}\n\n` +
-          `${BOLD_ON}${name.toUpperCase()} (${bagCount}B)${BOLD_OFF}\n\n\n` +
+          `${CENTER}\n` +
+          // Huge Token and Medium (i/n)
+          `${HUGE_BOLD}${cleanToken} ${LARGE}(${i}/${bagCount})${NORMAL}\n\n` +
+          // Replace Name with Mobile Number
+          `\x1BE\x01MOBILE: ${mobile}\x1BE\x00\n` +
+          `(${bagCount}B TOTAL)\n\n` +
           `${FF}`;
       }
     }
@@ -329,7 +326,7 @@ const printTokens = (
       `${CENTER}${BOLD_ON}PUNE CLOAKROOM 2026${BOLD_OFF}\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
-      `${JUMBO}${displayToken}${NORMAL}\n` +
+      `${HUGE_BOLD}${cleanToken}${NORMAL}\n` +
       `${otherTokensStr}` + // Prints the comma separated list if there are > 1 bags
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
@@ -353,8 +350,6 @@ const printTokens = (
 
   // Execute Print via RawBT
   const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
-
-  // Safely trigger the Intent
   const link = document.createElement("a");
   link.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
   link.click();
