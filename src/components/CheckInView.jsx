@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.9
+        Pune Cloakroom 2.10
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -268,12 +268,10 @@ const printTokens = (
   printBagLabels = true,
   enablePageCut = false,
 ) => {
-  // --- SAFE STABLE SIZES ---
-  const JUMBO = "\x1D\x21\x11"; // Double Width & Height (Safe)
+  // --- PERFECT PROPORTIONAL SIZES ---
+  const MAX_SIZE = "\x1D\x21\x33"; // 4x Width & 4x Height (Massive & Square)
+  const JUMBO = "\x1D\x21\x11"; // 2x Width & 2x Height (Safe)
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
-
-  const MAX_SIZE = "\x1D\x21\x77"; // 8x Width & 8x Height (Absolute Max ESC/POS Size)
-  const HUGE = "\x1D\x21\x33";
 
   const BOLD_ON = "\x1BE\x01";
   const BOLD_OFF = "\x1BE\x00";
@@ -312,11 +310,13 @@ const printTokens = (
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          `${CENTER} \n\n\n` + // Top margin space (Reduced from 4 to 3)
-          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` + // Removed 1 \n
-          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n` + // Removed 1 \n
-          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` + // Removed bottom \n completely
-          `${FF}${CUT}`; // Form feed will now cleanly advance without spilling over
+          // Using " \n" (Space + Newline) forces the printer to roll the paper!
+          `${CENTER} \n \n \n` +
+          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
+          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
+          ` \n \n` + // Forced bottom margin to trigger gap sensor perfectly
+          `${FF}${CUT}`;
       }
     }
   }
@@ -339,7 +339,7 @@ const printTokens = (
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
       `${safeBarcode}\n` +
-      `${JUMBO}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
       `${otherTokensStr}` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
@@ -351,10 +351,11 @@ const printTokens = (
         let bagBigToken = String(currentToken);
 
         fullPrint +=
-          `${CENTER} \n\n\n` + // Top margin space
-          `${JUMBO}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-          `${JUMBO}(BAG)${NORMAL_SIZE}\n` +
-          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` + // Removed bottom \n completely
+          `${CENTER} \n \n \n` + // Forced top margin
+          `${MAX_SIZE}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${JUMBO}(BAG)${NORMAL_SIZE}\n\n` +
+          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
+          ` \n \n` + // Forced bottom margin
           `${FF}${CUT}`;
       }
     }
