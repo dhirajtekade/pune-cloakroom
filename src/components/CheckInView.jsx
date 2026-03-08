@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.1
+        Pune Cloakroom 2.2
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -266,25 +266,35 @@ const printTokens = (
   bagCount,
   mode = "PER_MAHATMA",
   printBagLabels = true,
-  enablePageCut = false, // <-- NEW PARAMETER
+  enablePageCut = false,
 ) => {
-  // --- NEW ESC/POS COMMANDS ---
-  const MASSIVE = "\x1D\x21\x33"; // 4x Width & 4x Height (True Massive)
-  const JUMBO = "\x1D\x21\x11"; // 2x Width & 2x Height
-  const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00"; // Reset all size modifiers
+  // --- MAXIMIZED ESC/POS COMMANDS ---
+  const MAX_SIZE = "\x1D\x21\x77"; // 8x Width & 8x Height (Absolute Max ESC/POS Size)
+  const HUGE = "\x1D\x21\x33"; // 4x Width & 4x Height (For the 1/2 fractions)
+  const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
 
   const BOLD_ON = "\x1BE\x01";
   const BOLD_OFF = "\x1BE\x00";
   const CENTER = "\x1Ba\x01";
-  const FF = "\x0C"; // Form Feed (Advances to next label gap)
-
-  // Cut Command (GS V 0) - Only triggers if enabled in Admin
+  const FF = "\x0C";
   const CUT = enablePageCut ? "\x1D\x56\x00" : "";
+
+  // --- SAFE BARCODE COMMANDS ---
+  const BARCODE_HEIGHT = "\x1D\x68\x40"; // 64 dots high
+  const BARCODE_WIDTH = "\x1D\x77\x04"; // Thicker bars for easier scanning
+  const BARCODE_TEXT_OFF = "\x1D\x48\x00";
 
   const todayDate = new Date().getDate();
   let fullPrint = "";
 
+  // cleanToken keeps "0054" for the barcode scanner to read safely
   const cleanToken = String(startTokenId).padStart(4, "0");
+
+  // bigToken strips zeros to just "54" for the massive visual print
+  const bigToken = String(Number(startTokenId));
+
+  // Create the CODE39 Barcode (Scans as "0054")
+  const safeBarcode = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${cleanToken}\x00`;
 
   if (mode === "PER_MAHATMA") {
     // --- A. MASTER MAHATMA TOKEN ---
@@ -292,22 +302,23 @@ const printTokens = (
       `${CENTER}${NORMAL_SIZE}PUNE CLOAKROOM 2026\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
-      `${MASSIVE}${BOLD_ON}${cleanToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+      `${safeBarcode}\n` + // Safe 1D Barcode
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
       `KEEP THIS SLIP SAFE\n` +
-      `${FF}${CUT}`; // Append Cut after Form Feed
+      `${FF}${CUT}`;
 
     // --- B. INDIVIDUAL BAG LABELS ---
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
           `${CENTER}\n` +
-          `${MASSIVE}${BOLD_ON}${cleanToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
+          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+          `${HUGE}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
           `${BOLD_ON}MOBILE: ${mobile}${BOLD_OFF}\n` +
           `(${bagCount}B TOTAL)\n\n` +
-          `${FF}${CUT}`; // Append Cut after Form Feed
+          `${FF}${CUT}`;
       }
     }
   }
