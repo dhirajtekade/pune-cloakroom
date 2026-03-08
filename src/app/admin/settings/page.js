@@ -6,16 +6,18 @@ import {
   BriefcaseIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
-  PrinterIcon, // Added for the toggle
+  PrinterIcon,
+  ScissorsIcon, // Added for the cutter toggle
 } from "@heroicons/react/24/outline";
 
 export default function AdminSettings() {
   const [mode, setMode] = useState("PER_MAHATMA");
   const [smsTemplate, setSmsTemplate] = useState("");
-  // ADD THIS STATE:
   const [checkoutTemplate, setCheckoutTemplate] = useState("");
-  // NEW STATE FOR PRINTER TOGGLE
   const [printBagLabels, setPrintBagLabels] = useState(true);
+
+  // NEW STATE FOR PAGE CUTTER
+  const [enablePageCut, setEnablePageCut] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(false);
@@ -23,24 +25,27 @@ export default function AdminSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // Updated to fetch 4 keys now
-        const [modeRes, smsRes, checkoutRes, printRes] = await Promise.all([
-          fetch("/api/settings?key=system_mode"),
-          fetch("/api/settings?key=sms_template"),
-          fetch("/api/settings?key=checkout_sms_template"),
-          fetch("/api/settings?key=print_bag_labels"), // Added this
-        ]);
+        // Updated to fetch 5 keys now
+        const [modeRes, smsRes, checkoutRes, printRes, cutRes] =
+          await Promise.all([
+            fetch("/api/settings?key=system_mode"),
+            fetch("/api/settings?key=sms_template"),
+            fetch("/api/settings?key=checkout_sms_template"),
+            fetch("/api/settings?key=print_bag_labels"),
+            fetch("/api/settings?key=enable_page_cut"), // Added this
+          ]);
 
         const modeData = await modeRes.json();
         const smsData = await smsRes.json();
         const checkoutData = await checkoutRes.json();
         const printData = await printRes.json();
+        const cutData = await cutRes.json(); // Added this
 
         if (modeData.value) setMode(modeData.value);
         if (smsData.value) setSmsTemplate(smsData.value);
         if (checkoutData.value) setCheckoutTemplate(checkoutData.value);
-        // Set printer state (Database stores as string "true"/"false")
-        setPrintBagLabels(printData.value === "true");
+        if (printData.value) setPrintBagLabels(printData.value === "true");
+        if (cutData.value) setEnablePageCut(cutData.value === "true"); // Added this
 
         setLoading(false);
       } catch (err) {
@@ -82,7 +87,7 @@ export default function AdminSettings() {
           </h1>
         </div>
 
-        {/* NEW SECTION: PRINTER CONTROL */}
+        {/* PRINTER CONTROL SECTION */}
         <div className="space-y-4 mb-12">
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">
             Printer Configuration
@@ -114,6 +119,38 @@ export default function AdminSettings() {
             {/* Small Toggle Visual */}
             <div
               className={`w-4 h-4 rounded-full ${printBagLabels ? "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" : "bg-gray-700"}`}
+            ></div>
+          </button>
+
+          {/* NEW PAGE CUTTER TOGGLE */}
+          <button
+            onClick={() => {
+              const newValue = !enablePageCut;
+              setEnablePageCut(newValue);
+              updateSetting("enable_page_cut", newValue);
+            }}
+            className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+              enablePageCut
+                ? "border-red-600 bg-red-600/10"
+                : "border-gray-800 bg-gray-900/50 opacity-40"
+            }`}
+          >
+            <ScissorsIcon
+              className={`h-8 w-8 ${enablePageCut ? "text-red-400" : "text-gray-500"}`}
+            />
+            <div className="text-left flex-grow">
+              <p className="font-black text-lg uppercase">
+                Hardware Page Cutter
+              </p>
+              <p className="text-xs text-gray-400 leading-tight">
+                {enablePageCut
+                  ? "ON: Printer will cut after every slip"
+                  : "OFF: Continuous roll (Tear manually)"}
+              </p>
+            </div>
+            {/* Small Toggle Visual */}
+            <div
+              className={`w-4 h-4 rounded-full ${enablePageCut ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]" : "bg-gray-700"}`}
             ></div>
           </button>
         </div>
@@ -217,7 +254,7 @@ export default function AdminSettings() {
           </p>
         </div>
 
-        {/* Add this below your check-in template section */}
+        {/* CHECKOUT SMS TEMPLATE */}
         <div className="space-y-4 mt-8">
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
             Checkout SMS Template
