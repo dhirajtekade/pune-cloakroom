@@ -6,6 +6,7 @@ import {
   BriefcaseIcon,
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
+  PrinterIcon, // Added for the toggle
 } from "@heroicons/react/24/outline";
 
 export default function AdminSettings() {
@@ -13,26 +14,33 @@ export default function AdminSettings() {
   const [smsTemplate, setSmsTemplate] = useState("");
   // ADD THIS STATE:
   const [checkoutTemplate, setCheckoutTemplate] = useState("");
+  // NEW STATE FOR PRINTER TOGGLE
+  const [printBagLabels, setPrintBagLabels] = useState(true);
+
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // Updated to fetch 3 keys instead of 2
-        const [modeRes, smsRes, checkoutRes] = await Promise.all([
+        // Updated to fetch 4 keys now
+        const [modeRes, smsRes, checkoutRes, printRes] = await Promise.all([
           fetch("/api/settings?key=system_mode"),
           fetch("/api/settings?key=sms_template"),
-          fetch("/api/settings?key=checkout_sms_template"), // Added this
+          fetch("/api/settings?key=checkout_sms_template"),
+          fetch("/api/settings?key=print_bag_labels"), // Added this
         ]);
 
         const modeData = await modeRes.json();
         const smsData = await smsRes.json();
         const checkoutData = await checkoutRes.json();
+        const printData = await printRes.json();
 
         if (modeData.value) setMode(modeData.value);
         if (smsData.value) setSmsTemplate(smsData.value);
-        if (checkoutData.value) setCheckoutTemplate(checkoutData.value); // Added this
+        if (checkoutData.value) setCheckoutTemplate(checkoutData.value);
+        // Set printer state (Database stores as string "true"/"false")
+        setPrintBagLabels(printData.value === "true");
 
         setLoading(false);
       } catch (err) {
@@ -47,10 +55,11 @@ export default function AdminSettings() {
     await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, value }),
+      body: JSON.stringify({ key, value: String(value) }), // Ensure it's a string
     });
 
-    if (key === "sms_template") {
+    // Show saved status for templates
+    if (key.includes("template")) {
       setSaveStatus(true);
       setTimeout(() => setSaveStatus(false), 2000);
     }
@@ -71,6 +80,42 @@ export default function AdminSettings() {
           <h1 className="text-3xl font-black uppercase tracking-tighter">
             System Settings
           </h1>
+        </div>
+
+        {/* NEW SECTION: PRINTER CONTROL */}
+        <div className="space-y-4 mb-12">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">
+            Printer Configuration
+          </p>
+
+          <button
+            onClick={() => {
+              const newValue = !printBagLabels;
+              setPrintBagLabels(newValue);
+              updateSetting("print_bag_labels", newValue);
+            }}
+            className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+              printBagLabels
+                ? "border-orange-600 bg-orange-600/10"
+                : "border-gray-800 bg-gray-900/50 opacity-40"
+            }`}
+          >
+            <PrinterIcon
+              className={`h-8 w-8 ${printBagLabels ? "text-orange-400" : "text-gray-500"}`}
+            />
+            <div className="text-left flex-grow">
+              <p className="font-black text-lg uppercase">Print Bag Labels</p>
+              <p className="text-xs text-gray-400 leading-tight">
+                {printBagLabels
+                  ? "ON: Printing both Mahatma & Bag tokens"
+                  : "OFF: Printing Master Mahatma token only"}
+              </p>
+            </div>
+            {/* Small Toggle Visual */}
+            <div
+              className={`w-4 h-4 rounded-full ${printBagLabels ? "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" : "bg-gray-700"}`}
+            ></div>
+          </button>
         </div>
 
         {/* SECTION 1: NUMBERING MODE */}
@@ -118,7 +163,7 @@ export default function AdminSettings() {
             <div className="text-left">
               <p className="font-black text-lg uppercase">Per Bag</p>
               <p className="text-xs text-gray-400 leading-tight">
-                Each bag gets a unique auto-incremented ID
+                Individual IDs for every bag
               </p>
             </div>
           </button>

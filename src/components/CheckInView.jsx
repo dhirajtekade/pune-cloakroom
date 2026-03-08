@@ -265,6 +265,108 @@ const printTokens = (
   city,
   bagCount,
   mode = "PER_MAHATMA",
+  printBagLabels = true,
+) => {
+  // ESC/POS Sizing and Styling Commands
+  const JUMBO = "\x1B\x21\x30"; // Double Height & Double Width (Huge)
+  const LARGE = "\x1B\x21\x10"; // Double Height (Tall)
+  const NORMAL = "\x1B\x21\x00"; // Standard size
+  const BOLD_ON = "\x1BE\x01";
+  const BOLD_OFF = "\x1BE\x00";
+  const CENTER = "\x1Ba\x01";
+  const FF = "\x0C"; // Form Feed (Ejects exactly to the next 50mm label gap)
+
+  const todayDate = new Date().getDate();
+  let fullPrint = "";
+
+  // The very first token ID format for this check-in (e.g., "8-0093")
+  const firstTokenNum = Number(startTokenId);
+  const displayToken = `${todayDate}-${String(firstTokenNum).padStart(4, "0")}`;
+
+  // ==========================================
+  // MODE 1: TOKEN PER MAHATMA (Cluster Mode)
+  // ==========================================
+  if (mode === "PER_MAHATMA") {
+    // --- A. PRINT THE MASTER MAHATMA TOKEN ---
+    fullPrint +=
+      `${CENTER}${BOLD_ON}PUNE CLOAKROOM 2026${BOLD_OFF}\n` +
+      `DATE: ${todayDate} MARCH 2026\n` +
+      `--------------------------------\n` +
+      `${JUMBO}${displayToken}${NORMAL}\n` +
+      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
+      `--------------------------------\n` +
+      `KEEP THIS SLIP SAFE\n` +
+      `${FF}`;
+
+    // --- B. PRINT INDIVIDUAL BAG LABELS ---
+    if (printBagLabels) {
+      for (let i = 1; i <= bagCount; i++) {
+        fullPrint +=
+          `${CENTER}\n\n` +
+          `${JUMBO}${displayToken} ${LARGE}(${i}/${bagCount})${NORMAL}\n\n` +
+          `${BOLD_ON}${name.toUpperCase()} (${bagCount}B)${BOLD_OFF}\n\n\n` +
+          `${FF}`;
+      }
+    }
+  }
+
+  // ==========================================
+  // MODE 2: TOKEN PER BAG (Individual Mode)
+  // ==========================================
+  else if (mode === "PER_BAG") {
+    // Create the comma-separated string of remaining bags (e.g., "& 0094, 0095")
+    let otherTokensStr = "";
+    if (bagCount > 1) {
+      const otherTokens = [];
+      for (let i = 1; i < bagCount; i++) {
+        otherTokens.push(String(firstTokenNum + i).padStart(4, "0"));
+      }
+      otherTokensStr = `& ${otherTokens.join(",")}\n`;
+    }
+
+    // --- A. PRINT THE MASTER MAHATMA TOKEN ---
+    fullPrint +=
+      `${CENTER}${BOLD_ON}PUNE CLOAKROOM 2026${BOLD_OFF}\n` +
+      `DATE: ${todayDate} MARCH 2026\n` +
+      `--------------------------------\n` +
+      `${JUMBO}${displayToken}${NORMAL}\n` +
+      `${otherTokensStr}` + // Prints the comma separated list if there are > 1 bags
+      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
+      `--------------------------------\n` +
+      `KEEP THIS SLIP SAFE\n${FF}`;
+
+    // --- B. PRINT INDIVIDUAL BAG LABELS ---
+    if (printBagLabels) {
+      for (let i = 0; i < bagCount; i++) {
+        let currentToken = firstTokenNum + i;
+        let bagDisplayToken = `${todayDate}-${String(currentToken).padStart(4, "0")}`;
+
+        // Padded with \n to use the 50mm height effectively
+        fullPrint +=
+          `${CENTER}\n\n` +
+          `${JUMBO}${bagDisplayToken}${NORMAL}\n\n` +
+          `${BOLD_ON}${name.toUpperCase()} (${bagCount}B)${BOLD_OFF}\n\n\n` +
+          `${FF}`;
+      }
+    }
+  }
+
+  // Execute Print via RawBT
+  const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
+
+  // Safely trigger the Intent
+  const link = document.createElement("a");
+  link.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+  link.click();
+};
+
+const printTokens_backup = (
+  startTokenId,
+  name,
+  mobile,
+  city,
+  bagCount,
+  mode = "PER_MAHATMA",
 ) => {
   const JUMBO = "\x1B\x21\x30";
   const NORMAL = "\x1B\x21\x00";
