@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.0
+        Pune Cloakroom 2.1
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
