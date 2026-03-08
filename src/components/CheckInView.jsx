@@ -37,6 +37,12 @@ export default function CheckInView() {
         //   console.log("Printing skipped: Likely on Desktop");
         // }
 
+        try {
+          printTokens(data.tokenId, name, mobile, city, bagCount, data.mode);
+        } catch (err) {
+          console.log("Printing skipped");
+        }
+
         setSuccessData({
           tokenId: data.tokenId,
           name: name, // Make sure this isn't empty
@@ -59,13 +65,17 @@ export default function CheckInView() {
     if (!successData) return;
     setIsResending(true);
 
+    // ADD THIS LINE: Calculate the token format the backend expects
+    const dateCode = new Date().getDate();
+    const displayToken = `${dateCode}-${String(successData.tokenId).padStart(4, "0")}`;
+
     try {
       const res = await fetch("/api/checkin/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mobile: successData.mobile,
-          tokenId: successData.tokenId,
+          tokenId: displayToken, // SEND displayToken INSTEAD of the raw ID
           name: successData.name,
           bagCount: successData.bagCount,
         }),
@@ -75,6 +85,8 @@ export default function CheckInView() {
       if (data.success) {
         alert("SMS Sent Successfully!");
       } else {
+        // This is where you were seeing "displayToken is not defined"
+        // because the API was crashing.
         alert("Failed to send: " + data.error);
       }
     } catch (err) {
@@ -84,18 +96,24 @@ export default function CheckInView() {
     }
   };
 
+  //whatasapp share
   const shareToWhatsApp = () => {
     if (!successData) return;
 
+    const dateCode = new Date().getDate();
+    const displayToken = `${dateCode}-${String(successData.tokenId).padStart(4, "0")}`;
+
     // 1. Format the token correctly
     const { tokenId, name, mobile, bagCount } = successData;
-    const tokenStr = `#${String(tokenId).padStart(4, "0")}`;
+    // Create the display token (e.g., 12-0045)
+    // const tokenStr = `#${String(tokenId).padStart(4, "0")}`;
 
     // 2. Build the message string
     const messageText =
       `*SAMAN GHAR PUNE*\n` +
       `Jai Satchitanand!\n\n` +
-      `Token: *${tokenStr}*\n` +
+      `Date: ${dateCode} March\n` +
+      `Token: *${displayToken}*\n` +
       `Name: *${name.toUpperCase()}*\n` +
       `Bags: *${bagCount}*\n\n` +
       `Please show this message to collect your bags.`;
@@ -107,6 +125,7 @@ export default function CheckInView() {
     window.open(`https://wa.me/91${mobile}?text=${encodedText}`, "_blank");
   };
 
+  //reset form
   const resetForm = () => {
     setSuccessData(null);
     setName("");
@@ -116,6 +135,9 @@ export default function CheckInView() {
   };
 
   if (successData) {
+    const dateCode = new Date().getDate();
+    const displayToken = `${dateCode}-${String(successData.tokenId).padStart(4, "0")}`;
+
     return (
       <div className="bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md mx-auto border-2 border-green-500/50 text-center">
         <div className="flex justify-center mb-4">
@@ -125,7 +147,7 @@ export default function CheckInView() {
           Checked In!
         </h2>
         <p className="text-gray-400 mb-6 font-bold tracking-widest text-xl text-blue-400">
-          TOKEN: #{String(successData.tokenId).padStart(4, "0")}
+          TOKEN: {displayToken}
         </p>
 
         <div className="space-y-4">
@@ -247,16 +269,29 @@ const printTokens = (
   const JUMBO = "\x1B\x21\x30";
   const NORMAL = "\x1B\x21\x00";
   const FF = "\x0C";
+  const todayDate = new Date().getDate(); // Get date once
   let fullPrint = "";
 
   for (let i = 0; i < bagCount; i++) {
     let currentToken =
       mode === "PER_BAG" ? Number(startTokenId) + i : startTokenId;
+
+    // Construct the 12-0045 format here
+    const displayToken = `${todayDate}-${String(currentToken).padStart(4, "0")}`;
+
     let subtitle =
       mode === "PER_BAG"
         ? `BAG ${i + 1} OF ${bagCount}`
         : `TAG ${i + 1}/${bagCount}`;
-    fullPrint += `\x1Ba\x01\x1BE\x01PUNE CLOAKROOM 2026\x1BE\x00\n--------------------------------\n${JUMBO}TOKEN: ${currentToken}${NORMAL}\n--------------------------------\n${subtitle}\n${name.toUpperCase()}\n${city ? city.toUpperCase() : ""}\nKEEP WITH LUGGAGE\n${FF}`;
+
+    fullPrint +=
+      `\x1Ba\x01\x1BE\x01PUNE CLOAKROOM 2026\x1BE\x00\n` +
+      `DATE: ${todayDate} MARCH 2026\n` +
+      `--------------------------------\n` +
+      `${JUMBO}TOKEN: ${displayToken}${NORMAL}\n` +
+      `--------------------------------\n` +
+      `${subtitle}\n${name.toUpperCase()}\n${city ? city.toUpperCase() : ""}\n` +
+      `KEEP WITH LUGGAGE\n${FF}`;
   }
   const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
   window.location.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;

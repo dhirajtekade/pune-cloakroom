@@ -13,7 +13,7 @@ export default function CheckoutPage() {
     const res = await fetch('/api/records');
     const data = await res.json();
     // Only show people waiting for pickup (STORED but requested)
-    setQueue(data.records.filter(r => r.pickup_requested_at && r.status === 'STORED'));
+    setQueue(data.records.filter(r => r.updated_at && r.status === 'STORED'));
   };
 
   // 2. Setup Scanner and Auto-Refresh
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 gap-3">
           {queue.map(item => {
-            const wait = Math.floor((new Date() - new Date(item.pickup_requested_at)) / 60000);
+            const wait = Math.floor((new Date() - new Date(item.updated_at)) / 60000);
             const isUrgent = wait >= 5;
 
             return (

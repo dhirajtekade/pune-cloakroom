@@ -62,20 +62,21 @@ async function sendCloakroomSMS(mobileNumber, finalMessage) {
 // }
 
 const shareToWhatsApp = (mobile, tokenId, name, bagCount) => {
-  const formattedToken = `#${String(tokenId).padStart(4, '0')}`;
-  
+  const formattedToken = `#${String(tokenId).padStart(4, "0")}`;
+
   // Professional, clear text message
-  const text = `*SAMAN GHAR TOKEN*%0A%0A` +
-               `Jai Satchitanand!%0A` +
-               `Name: *${name}*%0A` +
-               `Token: *${formattedToken}*%0A` +
-               `Bags: *${bagCount}*%0A%0A` +
-               `Please show this message or the paper slip to collect your bags.`;
+  const text =
+    `*SAMAN GHAR TOKEN*%0A%0A` +
+    `Jai Satchitanand!%0A` +
+    `Name: *${name}*%0A` +
+    `Token: *${formattedToken}*%0A` +
+    `Bags: *${bagCount}*%0A%0A` +
+    `Please show this message or the paper slip to collect your bags.`;
 
   // Standard WhatsApp Web/App Link
-  const url = `https://wa.me/91${mobile.replace(/\D/g, '')}?text=${text}`;
-  
-  window.open(url, '_blank');
+  const url = `https://wa.me/91${mobile.replace(/\D/g, "")}?text=${text}`;
+
+  window.open(url, "_blank");
 };
 
 export async function POST(request) {
@@ -100,32 +101,39 @@ export async function POST(request) {
     });
 
     // 2. Insert and get Token ID
+    // 1. Get Today's Date String (YYYY-MM-DD)
+    // Inside your POST function in api/checkin/route.js
+    const today = new Date();
+    const dateCode = today.getDate(); // e.g., 12
+
+    // 2. Insert and get the count for today to use as a "Daily Token"
     const insertResult = await sql`
-      INSERT INTO checkins (name, mobile, city, bag_count, status) 
-      VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED') 
-      RETURNING token_id;
-    `;
+  INSERT INTO checkins (name, mobile, city, bag_count, status) 
+  VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED') 
+  RETURNING token_id;
+`;
     const startTokenId = insertResult[0].token_id;
 
-    // 3. Handle sequence advancement
+    // 2. Handle sequence advancement for "PER_BAG"
     if (mode === "PER_BAG" && bagCount > 1) {
-      const tokensToSkip = bagCount - 1;
-      await sql`
-        SELECT setval(
-          pg_get_serial_sequence('checkins', 'token_id'), 
-          nextval(pg_get_serial_sequence('checkins', 'token_id')) + ${tokensToSkip} - 1, 
-          true
-        );
-      `;
+      // We already used 1 ID for the insert. We need to skip the next (bagCount - 1) IDs.
+      await sql`SELECT setval(
+    pg_get_serial_sequence('checkins', 'token_id'), 
+    nextval(pg_get_serial_sequence('checkins', 'token_id')) + ${bagCount} - 2, 
+    true
+  );`;
     }
+
+    // 3. Create the Display Token (Date-Token)
+    const displayToken = `${dateCode}-${String(startTokenId).padStart(4, "0")}`;
 
     // 4. Trigger SMS (Corrected Variable Replacement)
     if (mobile && mobile.length >= 10) {
       const formattedToken = `#${String(startTokenId).padStart(4, "0")}`;
 
       const finalMessage = smsTemplate
-        .replace(/{{name}}/g, name || "Mahatma")
-        .replace(/{{tokenId}}/g, formattedToken)
+        .replace(/{{name}}/g, name)
+        .replace(/{{tokenId}}/g, displayToken) // Now sends 12-0045
         .replace(/{{bagCount}}/g, (bagCount || 1).toString()); // Ensure it's a string and not empty
 
       // Call with only 2 arguments: mobile and the message

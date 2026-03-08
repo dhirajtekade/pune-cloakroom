@@ -37,7 +37,7 @@ export async function POST(request) {
     const formattedToken = `#${String(tokenId).padStart(4, "0")}`;
     const finalMessage = smsTemplate
       .replace(/{{name}}/g, name)
-      .replace(/{{tokenId}}/g, formattedToken)
+      .replace(/{{tokenId}}/g, displayToken) // Now sends 12-0045
       .replace(/{{bagCount}}/g, bagCount);
 
     const success = await sendCloakroomSMS(mobile, finalMessage);

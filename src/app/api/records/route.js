@@ -44,9 +44,9 @@ export async function PUT(request) {
 
     // Inside your PUT function
     if (action === "REQUEST_PICKUP") {
-      await sql`UPDATE checkins SET pickup_requested_at = NOW() WHERE token_id = ${id}`;
+      await sql`UPDATE checkins SET updated_at = NOW() WHERE token_id = ${id}`;
     } else if (action === "FINAL_CHECKOUT") {
-      await sql`UPDATE checkins SET status = 'RETURNED', pickup_requested_at = NULL WHERE token_id = ${id}`;
+      await sql`UPDATE checkins SET status = 'RETURNED', updated_at = NULL WHERE token_id = ${id}`;
     }
 
     return NextResponse.json({ success: true });

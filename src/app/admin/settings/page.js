@@ -11,22 +11,29 @@ import {
 export default function AdminSettings() {
   const [mode, setMode] = useState("PER_MAHATMA");
   const [smsTemplate, setSmsTemplate] = useState("");
+  // ADD THIS STATE:
+  const [checkoutTemplate, setCheckoutTemplate] = useState("");
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(false);
 
   useEffect(() => {
-    // Fetch both settings
     const fetchSettings = async () => {
       try {
-        const [modeRes, smsRes] = await Promise.all([
+        // Updated to fetch 3 keys instead of 2
+        const [modeRes, smsRes, checkoutRes] = await Promise.all([
           fetch("/api/settings?key=system_mode"),
           fetch("/api/settings?key=sms_template"),
+          fetch("/api/settings?key=checkout_sms_template"), // Added this
         ]);
+
         const modeData = await modeRes.json();
         const smsData = await smsRes.json();
+        const checkoutData = await checkoutRes.json();
 
         if (modeData.value) setMode(modeData.value);
         if (smsData.value) setSmsTemplate(smsData.value);
+        if (checkoutData.value) setCheckoutTemplate(checkoutData.value); // Added this
+
         setLoading(false);
       } catch (err) {
         console.error("Error loading settings", err);
@@ -163,6 +170,21 @@ export default function AdminSettings() {
           <p className="text-[11px] text-gray-500 px-2 italic">
             Tip: For Marathi, ensure the message is short to save SMS credits.
           </p>
+        </div>
+
+        {/* Add this below your check-in template section */}
+        <div className="space-y-4 mt-8">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+            Checkout SMS Template
+          </p>
+          <textarea
+            value={checkoutTemplate}
+            onChange={(e) => setCheckoutTemplate(e.target.value)}
+            onBlur={() =>
+              updateSetting("checkout_sms_template", checkoutTemplate)
+            }
+            className="w-full bg-gray-900 border-2 border-gray-800 rounded-2xl p-4 text-white h-24"
+          />
         </div>
       </div>
     </div>

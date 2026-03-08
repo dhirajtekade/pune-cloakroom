@@ -9,7 +9,7 @@ export default function PickupDashboard() {
     const data = await res.json();
     // Filter for tokens that have a request time and are not yet returned
     const pending = data.records.filter(
-      (r) => r.pickup_requested_at && r.status === "STORED",
+      (r) => r.updated_at && r.status === "STORED",
     );
     setQueue(pending);
   };
@@ -44,7 +44,7 @@ export default function PickupDashboard() {
         {queue.map((item) => {
           // Calculate wait time
           const waitTime = Math.floor(
-            (new Date() - new Date(item.pickup_requested_at)) / 60000,
+            (new Date() - new Date(item.updated_at)) / 60000,
           );
           const isUrgent = waitTime >= 5;
 
