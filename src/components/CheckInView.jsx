@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.3
+        Pune Cloakroom 2.4
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -297,14 +297,14 @@ const printTokens = (
   if (mode === "PER_MAHATMA") {
     // --- A. MASTER MAHATMA TOKEN ---
     fullPrint +=
-      `${CENTER}${NORMAL_SIZE}पुणे सामानघर 2026\n` +
+      `${CENTER}${NORMAL_SIZE}Pune Cloakroom 2026\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
       `${safeBarcode}\n` +
       `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
-      `टोकन व्यवस्थित ठेवा!\n` +
+      `Keep token safe!\n` +
       `${FF}${CUT}`;
 
     // --- B. INDIVIDUAL BAG LABELS ---
@@ -336,7 +336,7 @@ const printTokens = (
 
     // --- A. PRINT THE MASTER MAHATMA TOKEN ---
     fullPrint +=
-      `${CENTER}${BOLD_ON}पुणे सामानघर 2026${BOLD_OFF}\n` +
+      `${CENTER}${BOLD_ON}Pune Cloakroom 2026${BOLD_OFF}\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
       `${safeBarcode}\n` +
@@ -344,7 +344,7 @@ const printTokens = (
       `${otherTokensStr}` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
-      `टोकन व्यवस्थित ठेवा!\n${FF}`;
+      `Keep token safe!\n${FF}`;
 
     // --- B. PRINT INDIVIDUAL BAG LABELS ---
     if (printBagLabels) {
