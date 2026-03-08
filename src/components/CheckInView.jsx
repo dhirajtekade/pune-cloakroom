@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.2
+        Pune Cloakroom 2.3
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -268,9 +268,10 @@ const printTokens = (
   printBagLabels = true,
   enablePageCut = false,
 ) => {
-  // --- MAXIMIZED ESC/POS COMMANDS ---
-  const MAX_SIZE = "\x1D\x21\x77"; // 8x Width & 8x Height (Absolute Max ESC/POS Size)
-  const HUGE = "\x1D\x21\x33"; // 4x Width & 4x Height (For the 1/2 fractions)
+  // --- HARDWARE-SAFE ESC/POS COMMANDS ---
+  // If \x55 (6x) still prints small, change it to \x44 (5x) or \x33 (4x)
+  const MAX_SIZE = "\x1D\x21\x55";
+  const HUGE = "\x1D\x21\x22"; // 3x Width & 3x Height for the fraction
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
 
   const BOLD_ON = "\x1BE\x01";
@@ -280,44 +281,41 @@ const printTokens = (
   const CUT = enablePageCut ? "\x1D\x56\x00" : "";
 
   // --- SAFE BARCODE COMMANDS ---
-  const BARCODE_HEIGHT = "\x1D\x68\x40"; // 64 dots high
-  const BARCODE_WIDTH = "\x1D\x77\x04"; // Thicker bars for easier scanning
+  const BARCODE_HEIGHT = "\x1D\x68\x40";
+  const BARCODE_WIDTH = "\x1D\x77\x04";
   const BARCODE_TEXT_OFF = "\x1D\x48\x00";
 
   const todayDate = new Date().getDate();
   let fullPrint = "";
 
-  // cleanToken keeps "0054" for the barcode scanner to read safely
-  const cleanToken = String(startTokenId).padStart(4, "0");
+  const firstTokenNum = Number(startTokenId);
+  const cleanToken = String(firstTokenNum).padStart(4, "0");
+  const bigToken = String(firstTokenNum);
 
-  // bigToken strips zeros to just "54" for the massive visual print
-  const bigToken = String(Number(startTokenId));
-
-  // Create the CODE39 Barcode (Scans as "0054")
   const safeBarcode = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${cleanToken}\x00`;
 
   if (mode === "PER_MAHATMA") {
     // --- A. MASTER MAHATMA TOKEN ---
     fullPrint +=
-      `${CENTER}${NORMAL_SIZE}PUNE CLOAKROOM 2026\n` +
+      `${CENTER}${NORMAL_SIZE}पुणे सामानघर 2026\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
-      `${safeBarcode}\n` + // Safe 1D Barcode
+      `${safeBarcode}\n` +
       `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
-      `KEEP THIS SLIP SAFE\n` +
+      `टोकन व्यवस्थित ठेवा!\n` +
       `${FF}${CUT}`;
 
     // --- B. INDIVIDUAL BAG LABELS ---
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          `${CENTER}\n` +
-          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-          `${HUGE}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
-          `${BOLD_ON}MOBILE: ${mobile}${BOLD_OFF}\n` +
-          `(${bagCount}B TOTAL)\n\n` +
+          `${CENTER}\n\n\n\n` + // <--- Added Top Margin Here
+          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${HUGE}(${i}/${bagCount})${NORMAL_SIZE}\n\n\n` +
+          `${BOLD_ON}${mobile}${BOLD_OFF}\n` +
+          `(${bagCount}B)\n\n\n\n` + // <--- Added Bottom Margin Here
           `${FF}${CUT}`;
       }
     }
@@ -327,7 +325,6 @@ const printTokens = (
   // MODE 2: TOKEN PER BAG (Individual Mode)
   // ==========================================
   else if (mode === "PER_BAG") {
-    // Create the comma-separated string of remaining bags (e.g., "& 0094, 0095")
     let otherTokensStr = "";
     if (bagCount > 1) {
       const otherTokens = [];
@@ -339,73 +336,33 @@ const printTokens = (
 
     // --- A. PRINT THE MASTER MAHATMA TOKEN ---
     fullPrint +=
-      `${CENTER}${BOLD_ON}PUNE CLOAKROOM 2026${BOLD_OFF}\n` +
+      `${CENTER}${BOLD_ON}पुणे सामानघर 2026${BOLD_OFF}\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
-      `${HUGE_BOLD}${cleanToken}${NORMAL}\n` +
-      `${otherTokensStr}` + // Prints the comma separated list if there are > 1 bags
+      `${safeBarcode}\n` +
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+      `${otherTokensStr}` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
-      `KEEP THIS SLIP SAFE\n${FF}`;
+      `टोकन व्यवस्थित ठेवा!\n${FF}`;
 
     // --- B. PRINT INDIVIDUAL BAG LABELS ---
     if (printBagLabels) {
       for (let i = 0; i < bagCount; i++) {
         let currentToken = firstTokenNum + i;
-        let bagDisplayToken = `${todayDate}-${String(currentToken).padStart(4, "0")}`;
+        let bagBigToken = String(currentToken);
 
-        // Padded with \n to use the 50mm height effectively
         fullPrint +=
-          `${CENTER}\n\n` +
-          `${JUMBO}${bagDisplayToken}${NORMAL}\n\n` +
-          `${BOLD_ON}${name.toUpperCase()} (${bagCount}B)${BOLD_OFF}\n\n\n` +
-          `${FF}`;
+          `${CENTER}\n\n\n\n` + // <--- Added Top Margin
+          `${MAX_SIZE}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${BOLD_ON}${name.toUpperCase()} (${bagCount}B)${BOLD_OFF}\n\n\n\n` +
+          `${FF}${CUT}`;
       }
     }
   }
 
-  // Execute Print via RawBT
   const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
   const link = document.createElement("a");
   link.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
   link.click();
-};
-
-const printTokens_backup = (
-  startTokenId,
-  name,
-  mobile,
-  city,
-  bagCount,
-  mode = "PER_MAHATMA",
-) => {
-  const JUMBO = "\x1B\x21\x30";
-  const NORMAL = "\x1B\x21\x00";
-  const FF = "\x0C";
-  const todayDate = new Date().getDate(); // Get date once
-  let fullPrint = "";
-
-  for (let i = 0; i < bagCount; i++) {
-    let currentToken =
-      mode === "PER_BAG" ? Number(startTokenId) + i : startTokenId;
-
-    // Construct the 12-0045 format here
-    const displayToken = `${todayDate}-${String(currentToken).padStart(4, "0")}`;
-
-    let subtitle =
-      mode === "PER_BAG"
-        ? `BAG ${i + 1} OF ${bagCount}`
-        : `TAG ${i + 1}/${bagCount}`;
-
-    fullPrint +=
-      `\x1Ba\x01\x1BE\x01PUNE CLOAKROOM 2026\x1BE\x00\n` +
-      `DATE: ${todayDate} MARCH 2026\n` +
-      `--------------------------------\n` +
-      `${JUMBO}TOKEN: ${displayToken}${NORMAL}\n` +
-      `--------------------------------\n` +
-      `${subtitle}\n${name.toUpperCase()}\n${city ? city.toUpperCase() : ""}\n` +
-      `KEEP WITH LUGGAGE\n${FF}`;
-  }
-  const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
-  window.location.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
 };
