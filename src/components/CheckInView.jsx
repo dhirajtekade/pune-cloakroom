@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.8
+        Pune Cloakroom 2.9
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -312,11 +312,11 @@ const printTokens = (
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          `${CENTER} \n\n\n\n` + // Top margin space
-          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
-          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n\n\n\n` + // Mobile and Total Bags combined
-          `${FF}${CUT}`;
+          `${CENTER} \n\n\n` + // Top margin space (Reduced from 4 to 3)
+          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` + // Removed 1 \n
+          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n` + // Removed 1 \n
+          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` + // Removed bottom \n completely
+          `${FF}${CUT}`; // Form feed will now cleanly advance without spilling over
       }
     }
   }
@@ -351,10 +351,10 @@ const printTokens = (
         let bagBigToken = String(currentToken);
 
         fullPrint +=
-          `${CENTER} \n\n\n\n` + // Top margin space
-          `${JUMBO}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-          `${JUMBO}(BAG)${NORMAL_SIZE}\n\n` +
-          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n\n\n\n` + // Mobile and Total Bags combined
+          `${CENTER} \n\n\n` + // Top margin space
+          `${JUMBO}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+          `${JUMBO}(BAG)${NORMAL_SIZE}\n` +
+          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` + // Removed bottom \n completely
           `${FF}${CUT}`;
       }
     }
