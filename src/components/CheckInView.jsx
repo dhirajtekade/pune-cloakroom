@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.4
+        Pune Cloakroom 2.5
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -268,10 +268,11 @@ const printTokens = (
   printBagLabels = true,
   enablePageCut = false,
 ) => {
-  // --- HARDWARE-SAFE ESC/POS COMMANDS ---
-  // If \x55 (6x) still prints small, change it to \x44 (5x) or \x33 (4x)
+  // --- COMBINED MAX SCALING COMMANDS ---
+  // We stack GS! (77 = 8x) and ESC! (30 = Double) to force the absolute hardware limit
+  const SUPER_MAX = "\x1D\x21\x77\x1B\x21\x30";
   const MAX_SIZE = "\x1D\x21\x55";
-  const HUGE = "\x1D\x21\x22"; // 3x Width & 3x Height for the fraction
+  const HUGE = "\x1D\x21\x22";
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
 
   const BOLD_ON = "\x1BE\x01";
@@ -301,21 +302,20 @@ const printTokens = (
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
       `${safeBarcode}\n` +
-      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+      `${SUPER_MAX}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
       `Keep token safe!\n` +
       `${FF}${CUT}`;
 
-    // --- B. INDIVIDUAL BAG LABELS ---
+    // --- B. INDIVIDUAL BAG LABELS (ULTRA MINIMAL) ---
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          `${CENTER}\n\n\n\n` + // <--- Added Top Margin Here
-          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-          `${HUGE}(${i}/${bagCount})${NORMAL_SIZE}\n\n\n` +
-          `${BOLD_ON}${mobile}${BOLD_OFF}\n` +
-          `(${bagCount}B)\n\n\n\n` + // <--- Added Bottom Margin Here
+          // The " " (space) before \n is CRITICAL. It stops the printer from ignoring the top margin.
+          `${CENTER} \n\n\n\n\n` +
+          `${SUPER_MAX}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${MAX_SIZE}(${i}/${bagCount})${NORMAL_SIZE}\n\n\n\n\n\n` +
           `${FF}${CUT}`;
       }
     }
@@ -340,22 +340,22 @@ const printTokens = (
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
       `${safeBarcode}\n` +
-      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+      `${SUPER_MAX}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
       `${otherTokensStr}` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
       `Keep token safe!\n${FF}`;
 
-    // --- B. PRINT INDIVIDUAL BAG LABELS ---
+    // --- B. PRINT INDIVIDUAL BAG LABELS (ULTRA MINIMAL) ---
     if (printBagLabels) {
       for (let i = 0; i < bagCount; i++) {
         let currentToken = firstTokenNum + i;
         let bagBigToken = String(currentToken);
 
         fullPrint +=
-          `${CENTER}\n\n\n\n` + // <--- Added Top Margin
-          `${MAX_SIZE}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-          `${BOLD_ON}${name.toUpperCase()} (${bagCount}B)${BOLD_OFF}\n\n\n\n` +
+          `${CENTER} \n\n\n\n\n` + // Added Space + Top Margin
+          `${SUPER_MAX}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${MAX_SIZE}(BAG)${NORMAL_SIZE}\n\n\n\n\n\n` + // Replaced name with just "(BAG)"
           `${FF}${CUT}`;
       }
     }
