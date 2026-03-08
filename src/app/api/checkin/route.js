@@ -86,15 +86,17 @@ export async function POST(request) {
     const { name, mobile, city, bagCount } = body;
 
     // 1. Fetch settings
+    // Add to your settingResult fetch query:
     const settingResult = await sql`
-                          SELECT key, value FROM settings 
-                          WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut')
-                        `;
+  SELECT key, value FROM settings 
+  WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut', 'print_as_image')
+`;
 
     let printBagLabels = "true";
     let enablePageCut = "false"; // New variable
-
+    let printAsImage = "false";
     let mode = "PER_MAHATMA";
+
     let smsTemplate =
       "JSCA {{name}}, Token: {{tokenId}} for {{bagCount}} bags.";
 
@@ -103,6 +105,7 @@ export async function POST(request) {
       if (row.key === "sms_template") smsTemplate = row.value;
       if (row.key === "print_bag_labels") printBagLabels = row.value;
       if (row.key === "enable_page_cut") enablePageCut = row.value; // Map new setting
+      if (row.key === "print_as_image") printAsImage = row.value;
     });
 
     // 2. Insert and get Token ID
@@ -154,8 +157,8 @@ export async function POST(request) {
       mode: mode,
       printBagLabels: printBagLabels === "true",
       enablePageCut: enablePageCut === "true", // Send as boolean
+      printAsImage: printAsImage === "true",
     });
-    
   } catch (error) {
     console.error("Check-In API Error:", error);
     return NextResponse.json({ error: "Server Error" }, { status: 500 });

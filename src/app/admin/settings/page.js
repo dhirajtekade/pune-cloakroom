@@ -15,6 +15,7 @@ export default function AdminSettings() {
   const [smsTemplate, setSmsTemplate] = useState("");
   const [checkoutTemplate, setCheckoutTemplate] = useState("");
   const [printBagLabels, setPrintBagLabels] = useState(true);
+  const [printAsImage, setPrintAsImage] = useState(false);
 
   // NEW STATE FOR PAGE CUTTER
   const [enablePageCut, setEnablePageCut] = useState(false);
@@ -25,27 +26,30 @@ export default function AdminSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // Updated to fetch 5 keys now
-        const [modeRes, smsRes, checkoutRes, printRes, cutRes] =
+        // Updated to fetch 6 keys now (added imgRes and the fetch URL)
+        const [modeRes, smsRes, checkoutRes, printRes, cutRes, imgRes] =
           await Promise.all([
             fetch("/api/settings?key=system_mode"),
             fetch("/api/settings?key=sms_template"),
             fetch("/api/settings?key=checkout_sms_template"),
             fetch("/api/settings?key=print_bag_labels"),
-            fetch("/api/settings?key=enable_page_cut"), // Added this
+            fetch("/api/settings?key=enable_page_cut"),
+            fetch("/api/settings?key=print_as_image"), // <-- ADDED THIS
           ]);
 
         const modeData = await modeRes.json();
         const smsData = await smsRes.json();
         const checkoutData = await checkoutRes.json();
         const printData = await printRes.json();
-        const cutData = await cutRes.json(); // Added this
+        const cutData = await cutRes.json();
+        const imgData = await imgRes.json(); // Now imgRes exists!
 
         if (modeData.value) setMode(modeData.value);
         if (smsData.value) setSmsTemplate(smsData.value);
         if (checkoutData.value) setCheckoutTemplate(checkoutData.value);
         if (printData.value) setPrintBagLabels(printData.value === "true");
-        if (cutData.value) setEnablePageCut(cutData.value === "true"); // Added this
+        if (cutData.value) setEnablePageCut(cutData.value === "true");
+        if (imgData.value) setPrintAsImage(imgData.value === "true");
 
         setLoading(false);
       } catch (err) {
@@ -151,6 +155,36 @@ export default function AdminSettings() {
             {/* Small Toggle Visual */}
             <div
               className={`w-4 h-4 rounded-full ${enablePageCut ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]" : "bg-gray-700"}`}
+            ></div>
+          </button>
+
+          {/* IMAGE PRINTING TOGGLE */}
+          <button
+            onClick={() => {
+              const newValue = !printAsImage;
+              setPrintAsImage(newValue);
+              updateSetting("print_as_image", newValue);
+            }}
+            className={`w-full p-5 mt-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+              printAsImage
+                ? "border-purple-600 bg-purple-600/10"
+                : "border-gray-800 bg-gray-900/50 opacity-40"
+            }`}
+          >
+            <div className="text-left flex-grow">
+              <p
+                className={`font-black text-lg uppercase ${printAsImage ? "text-purple-400" : "text-gray-500"}`}
+              >
+                Image Rendering Mode
+              </p>
+              <p className="text-xs text-gray-400 leading-tight">
+                {printAsImage
+                  ? "ON: Bypasses hardware limits. Infinite font sizes & Marathi support."
+                  : "OFF: Uses standard ESC/POS hardware text commands (Faster)."}
+              </p>
+            </div>
+            <div
+              className={`w-4 h-4 rounded-full ${printAsImage ? "bg-purple-500 shadow-[0_0_10px_rgba(147,51,234,0.8)]" : "bg-gray-700"}`}
             ></div>
           </button>
         </div>
