@@ -87,9 +87,12 @@ export async function POST(request) {
 
     // 1. Fetch settings
     const settingResult = await sql`
-      SELECT key, value FROM settings 
-      WHERE key IN ('system_mode', 'sms_template')
-    `;
+                          SELECT key, value FROM settings 
+                          WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut')
+                        `;
+
+    let printBagLabels = "true";
+    let enablePageCut = "false"; // New variable
 
     let mode = "PER_MAHATMA";
     let smsTemplate =
@@ -98,6 +101,8 @@ export async function POST(request) {
     settingResult.forEach((row) => {
       if (row.key === "system_mode") mode = row.value;
       if (row.key === "sms_template") smsTemplate = row.value;
+      if (row.key === "print_bag_labels") printBagLabels = row.value;
+      if (row.key === "enable_page_cut") enablePageCut = row.value; // Map new setting
     });
 
     // 2. Insert and get Token ID
@@ -145,8 +150,12 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       tokenId: startTokenId,
+      displayToken: displayToken,
       mode: mode,
+      printBagLabels: printBagLabels === "true",
+      enablePageCut: enablePageCut === "true", // Send as boolean
     });
+    
   } catch (error) {
     console.error("Check-In API Error:", error);
     return NextResponse.json({ error: "Server Error" }, { status: 500 });

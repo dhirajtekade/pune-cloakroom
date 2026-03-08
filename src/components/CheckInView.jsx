@@ -266,43 +266,48 @@ const printTokens = (
   bagCount,
   mode = "PER_MAHATMA",
   printBagLabels = true,
+  enablePageCut = false, // <-- NEW PARAMETER
 ) => {
-  // ESC/POS Commands
-  const HUGE_BOLD = "\x1D\x21\x11\x1BE\x01"; // Double Width + Double Height + Bold
-  const LARGE = "\x1B\x21\x10"; // Double Height (Tall)
-  const NORMAL = "\x1B\x21\x00\x1BE\x00"; // Reset to Normal + Bold OFF
+  // --- NEW ESC/POS COMMANDS ---
+  const MASSIVE = "\x1D\x21\x33"; // 4x Width & 4x Height (True Massive)
+  const JUMBO = "\x1D\x21\x11"; // 2x Width & 2x Height
+  const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00"; // Reset all size modifiers
+
+  const BOLD_ON = "\x1BE\x01";
+  const BOLD_OFF = "\x1BE\x00";
   const CENTER = "\x1Ba\x01";
-  const FF = "\x0C";
+  const FF = "\x0C"; // Form Feed (Advances to next label gap)
+
+  // Cut Command (GS V 0) - Only triggers if enabled in Admin
+  const CUT = enablePageCut ? "\x1D\x56\x00" : "";
 
   const todayDate = new Date().getDate();
   let fullPrint = "";
 
-  // CLEAN TOKEN: Remove the "8-" and just keep "0051"
   const cleanToken = String(startTokenId).padStart(4, "0");
 
   if (mode === "PER_MAHATMA") {
     // --- A. MASTER MAHATMA TOKEN ---
     fullPrint +=
-      `${CENTER}${NORMAL}PUNE CLOAKROOM 2026\n` +
+      `${CENTER}${NORMAL_SIZE}PUNE CLOAKROOM 2026\n` +
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
-      `${HUGE_BOLD}${cleanToken}${NORMAL}\n\n` + // Massive Bold Token
-      `\x1BE\x01${bagCount} Bags - ${name.toUpperCase()}\x1BE\x00\n` +
+      `${MASSIVE}${BOLD_ON}${cleanToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
       `KEEP THIS SLIP SAFE\n` +
-      `${FF}`;
+      `${FF}${CUT}`; // Append Cut after Form Feed
 
     // --- B. INDIVIDUAL BAG LABELS ---
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
           `${CENTER}\n` +
-          // Huge Token and Medium (i/n)
-          `${HUGE_BOLD}${cleanToken} ${LARGE}(${i}/${bagCount})${NORMAL}\n\n` +
-          // Replace Name with Mobile Number
-          `\x1BE\x01MOBILE: ${mobile}\x1BE\x00\n` +
+          `${MASSIVE}${BOLD_ON}${cleanToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
+          `${BOLD_ON}MOBILE: ${mobile}${BOLD_OFF}\n` +
           `(${bagCount}B TOTAL)\n\n` +
-          `${FF}`;
+          `${FF}${CUT}`; // Append Cut after Form Feed
       }
     }
   }
