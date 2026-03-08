@@ -188,7 +188,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.7
+        Pune Cloakroom 2.8
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -272,6 +272,9 @@ const printTokens = (
   const JUMBO = "\x1D\x21\x11"; // Double Width & Height (Safe)
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
 
+  const MAX_SIZE = "\x1D\x21\x77"; // 8x Width & 8x Height (Absolute Max ESC/POS Size)
+  const HUGE = "\x1D\x21\x33";
+
   const BOLD_ON = "\x1BE\x01";
   const BOLD_OFF = "\x1BE\x00";
   const CENTER = "\x1Ba\x01";
@@ -299,7 +302,7 @@ const printTokens = (
       `DATE: ${todayDate} MARCH 2026\n` +
       `--------------------------------\n` +
       `${safeBarcode}\n` +
-      `${JUMBO}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
       `--------------------------------\n` +
       `Keep token safe!\n` +
@@ -310,7 +313,7 @@ const printTokens = (
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
           `${CENTER} \n\n\n\n` + // Top margin space
-          `${JUMBO}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
           `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
           `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n\n\n\n` + // Mobile and Total Bags combined
           `${FF}${CUT}`;
