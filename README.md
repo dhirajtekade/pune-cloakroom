@@ -5,3 +5,7 @@
 - check feed always, if slightest of difference is rolling or label sticker then use feed button once to adjust properly
 
 - also marathi /hindi font is not working
+
+
+# TODO:
+- collect all errors in somefile with error description and time

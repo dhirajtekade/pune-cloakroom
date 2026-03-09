@@ -16,6 +16,7 @@ export default function AdminSettings() {
   const [checkoutTemplate, setCheckoutTemplate] = useState("");
   const [printBagLabels, setPrintBagLabels] = useState(true);
   const [printAsImage, setPrintAsImage] = useState(false);
+  const [enableAutoSms, setEnableAutoSms] = useState(false);
 
   // NEW STATE FOR PAGE CUTTER
   const [enablePageCut, setEnablePageCut] = useState(false);
@@ -28,16 +29,25 @@ export default function AdminSettings() {
     const fetchSettings = async () => {
       try {
         // Updated to fetch 6 keys now (added imgRes and the fetch URL)
-        const [modeRes, smsRes, checkoutRes, printRes, cutRes, imgRes] =
-          await Promise.all([
-            fetch("/api/settings?key=system_mode"),
-            fetch("/api/settings?key=sms_template"),
-            fetch("/api/settings?key=checkout_sms_template"),
-            fetch("/api/settings?key=print_bag_labels"),
-            fetch("/api/settings?key=enable_page_cut"),
-            fetch("/api/settings?key=print_as_image"), // <-- ADDED THIS
-            fetch("/api/settings?key=use_qr_code"), // <-- ADDED THIS
-          ]);
+        const [
+          modeRes,
+          smsRes,
+          checkoutRes,
+          printRes,
+          cutRes,
+          imgRes,
+          qrRes,
+          autoSmsRes,
+        ] = await Promise.all([
+          fetch("/api/settings?key=system_mode"),
+          fetch("/api/settings?key=sms_template"),
+          fetch("/api/settings?key=checkout_sms_template"),
+          fetch("/api/settings?key=print_bag_labels"),
+          fetch("/api/settings?key=enable_page_cut"),
+          fetch("/api/settings?key=print_as_image"), // <-- ADDED THIS
+          fetch("/api/settings?key=use_qr_code"), // <-- ADDED THIS
+          fetch("/api/settings?key=enable_auto_sms"),
+        ]);
 
         const modeData = await modeRes.json();
         const smsData = await smsRes.json();
@@ -45,7 +55,8 @@ export default function AdminSettings() {
         const printData = await printRes.json();
         const cutData = await cutRes.json();
         const imgData = await imgRes.json(); // Now imgRes exists!
-        const use_qr_code = await use_qr_code.json(); // Now imgRes exists!
+        const qrData = await qrRes.json(); // Now imgRes exists!
+        const autoSmsData = await autoSmsRes.json();
 
         if (modeData.value) setMode(modeData.value);
         if (smsData.value) setSmsTemplate(smsData.value);
@@ -53,7 +64,8 @@ export default function AdminSettings() {
         if (printData.value) setPrintBagLabels(printData.value === "true");
         if (cutData.value) setEnablePageCut(cutData.value === "true");
         if (imgData.value) setPrintAsImage(imgData.value === "true");
-        if (use_qr_code.value) setUseQrCode(use_qr_code.value === "true");
+        if (qrData.value) setUseQrCode(qrData.value === "true");
+        if (autoSmsData.value) setEnableAutoSms(autoSmsData.value === "true");
 
         setLoading(false);
       } catch (err) {
@@ -219,6 +231,36 @@ export default function AdminSettings() {
             </div>
             <div
               className={`w-4 h-4 rounded-full ${useQrCode ? "bg-pink-500 shadow-[0_0_10px_rgba(219,39,119,0.8)]" : "bg-gray-700"}`}
+            ></div>
+          </button>
+
+          {/* AUTO-SMS TOGGLE */}
+          <button
+            onClick={() => {
+              const newValue = !enableAutoSms;
+              setEnableAutoSms(newValue);
+              updateSetting("enable_auto_sms", newValue);
+            }}
+            className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+              enableAutoSms
+                ? "border-green-500 bg-green-500/10"
+                : "border-gray-800 bg-gray-900/50 opacity-40"
+            }`}
+          >
+            <div className="text-left flex-grow">
+              <p
+                className={`font-black text-lg uppercase ${enableAutoSms ? "text-green-400" : "text-gray-500"}`}
+              >
+                Auto-Send SMS: {enableAutoSms ? "ON" : "OFF"}
+              </p>
+              <p className="text-xs text-gray-400 leading-tight">
+                {enableAutoSms
+                  ? "WARNING: Costs ₹5.00 per check-in! SMS will send automatically."
+                  : "SAVING MONEY: Auto-SMS is disabled. Volunteers must use WhatsApp or 'Resend SMS' manually."}
+              </p>
+            </div>
+            <div
+              className={`w-4 h-4 rounded-full ${enableAutoSms ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]" : "bg-gray-700"}`}
             ></div>
           </button>
         </div>

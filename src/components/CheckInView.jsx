@@ -347,7 +347,7 @@ const printTokens = (
 
   if (mode === "PER_MAHATMA") {
     // --- A. MASTER MAHATMA TOKEN (TESTING: 3 COPIES) ---
-    for (let testLoop = 0; testLoop < 3; testLoop++) {
+    // for (let testLoop = 0; testLoop < 3; testLoop++) {//for testing only
       fullPrint +=
         `${CENTER}${NORMAL_SIZE}` +
         `\n DATE: ${todayDate} MARCH 2026\n\n` +
@@ -355,7 +355,7 @@ const printTokens = (
         `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
         `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n\n` +
         `${FF}${CUT}`;
-    }
+    // }
 
     // --- B. INDIVIDUAL BAG LABELS (Temporarily active for testing layout) ---
     if (printBagLabels) {
@@ -386,7 +386,7 @@ const printTokens = (
     }
 
     // Printing this 3 times for your test as well
-    for (let testLoop = 0; testLoop < 3; testLoop++) {
+    // for (let testLoop = 0; testLoop < 3; testLoop++) {
       fullPrint +=
         `${CENTER}${NORMAL_SIZE}` +
         `DATE: ${todayDate} MARCH 2026\n\n` +
@@ -395,7 +395,7 @@ const printTokens = (
         `${otherTokensStr}` +
         `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
         `${FF}${CUT}`;
-    }
+    // }
 
      if (printBagLabels) {
       for (let i = 0; i < bagCount; i++) {

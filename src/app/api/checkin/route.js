@@ -37,23 +37,23 @@ async function sendCloakroomSMS(mobileNumber, finalMessage) {
   }
 }
 
-const shareToWhatsApp = (mobile, tokenId, name, bagCount) => {
-  const formattedToken = `#${String(tokenId).padStart(4, "0")}`;
+// const shareToWhatsApp = (mobile, tokenId, name, bagCount) => {
+//   const formattedToken = `#${String(tokenId).padStart(4, "0")}`;
 
-  // Professional, clear text message
-  const text =
-    `*SAMAN GHAR TOKEN*%0A%0A` +
-    `Jai Satchitanand!%0A` +
-    `Name: *${name}*%0A` +
-    `Token: *${formattedToken}*%0A` +
-    `Bags: *${bagCount}*%0A%0A` +
-    `Please show this message or the paper slip to collect your bags.`;
+//   // Professional, clear text message
+//   const text =
+//     `*SAMAN GHAR TOKEN*%0A%0A` +
+//     `Jai Satchitanand!%0A` +
+//     `Name: *${name}*%0A` +
+//     `Token: *${formattedToken}*%0A` +
+//     `Bags: *${bagCount}*%0A%0A` +
+//     `Please show this message or the paper slip to collect your bags.`;
 
-  // Standard WhatsApp Web/App Link
-  const url = `https://wa.me/91${mobile.replace(/\D/g, "")}?text=${text}`;
+//   // Standard WhatsApp Web/App Link
+//   const url = `https://wa.me/91${mobile.replace(/\D/g, "")}?text=${text}`;
 
-  window.open(url, "_blank");
-};
+//   window.open(url, "_blank");
+// };
 
 export async function POST(request) {
   try {
@@ -64,7 +64,7 @@ export async function POST(request) {
     // 1. Fetch settings
     const settingResult = await sql`
       SELECT key, value FROM settings 
-      WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut', 'print_as_image', 'use_qr_code')
+      WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut', 'print_as_image', 'use_qr_code', 'enable_auto_sms')
     `;
 
     let printBagLabels = "true";
@@ -72,6 +72,7 @@ export async function POST(request) {
     let printAsImage = "false";
     let mode = "PER_MAHATMA";
     let useQrCode = "false";
+    let enableAutoSms = "false";
     let smsTemplate =
       "JSCA {{name}}, Token: {{tokenId}} for {{bagCount}} bags.";
 
@@ -82,6 +83,7 @@ export async function POST(request) {
       if (row.key === "enable_page_cut") enablePageCut = row.value;
       if (row.key === "print_as_image") printAsImage = row.value;
       if (row.key === "use_qr_code") useQrCode = row.value;
+      if (row.key === "enable_auto_sms") enableAutoSms = row.value;
     });
 
     // 2. Get Date Code (e.g., 9 for March 9th)
@@ -116,7 +118,7 @@ export async function POST(request) {
     }
 
     // 7. Trigger SMS using the new formatted token
-    if (mobile && mobile.length >= 10) {
+    if (enableAutoSms === "true" && mobile && mobile.length >= 10) {
       const finalMessage = smsTemplate
         .replace(/{{name}}/g, name)
         .replace(/{{tokenId}}/g, displayToken) // Sends "9-0093"
