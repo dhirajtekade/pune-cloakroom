@@ -75,17 +75,14 @@ export default function CheckInView() {
     if (!successData) return;
     setIsResending(true);
 
-    // ADD THIS LINE: Calculate the token format the backend expects
-    const dateCode = new Date().getDate();
-    const displayToken = `${dateCode}-${String(successData.tokenId).padStart(4, "0")}`;
-
     try {
       const res = await fetch("/api/checkin/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mobile: successData.mobile,
-          tokenId: displayToken, // SEND displayToken INSTEAD of the raw ID
+          // FIX: successData.tokenId is already fully formatted as "9-0094"
+          tokenId: successData.tokenId,
           name: successData.name,
           bagCount: successData.bagCount,
         }),
@@ -95,8 +92,6 @@ export default function CheckInView() {
       if (data.success) {
         alert("SMS Sent Successfully!");
       } else {
-        // This is where you were seeing "displayToken is not defined"
-        // because the API was crashing.
         alert("Failed to send: " + data.error);
       }
     } catch (err) {
@@ -105,7 +100,7 @@ export default function CheckInView() {
       setIsResending(false);
     }
   };
-
+  
   //whatasapp share
   const shareToWhatsApp = () => {
     if (!successData) return;
@@ -348,13 +343,13 @@ const printTokens = (
   if (mode === "PER_MAHATMA") {
     // --- A. MASTER MAHATMA TOKEN (TESTING: 3 COPIES) ---
     // for (let testLoop = 0; testLoop < 3; testLoop++) {//for testing only
-      fullPrint +=
-        `${CENTER}${NORMAL_SIZE}` +
-        `\n DATE: ${todayDate} MARCH 2026\n\n` +
-        `${scanCodeCommand}` + // Dynamically injects Barcode OR QR
-        `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-        `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n\n` +
-        `${FF}${CUT}`;
+    fullPrint +=
+      `${CENTER}${NORMAL_SIZE}` +
+      `\n DATE: ${todayDate} MARCH 2026\n\n` +
+      `${scanCodeCommand}` + // Dynamically injects Barcode OR QR
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n\n` +
+      `${FF}${CUT}`;
     // }
 
     // --- B. INDIVIDUAL BAG LABELS (Temporarily active for testing layout) ---
@@ -387,17 +382,17 @@ const printTokens = (
 
     // Printing this 3 times for your test as well
     // for (let testLoop = 0; testLoop < 3; testLoop++) {
-      fullPrint +=
-        `${CENTER}${NORMAL_SIZE}` +
-        `DATE: ${todayDate} MARCH 2026\n\n` +
-        `${scanCodeCommand}` + // <--- FIX: Changed from nativeQRCode to scanCodeCommand
-        `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-        `${otherTokensStr}` +
-        `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
-        `${FF}${CUT}`;
+    fullPrint +=
+      `${CENTER}${NORMAL_SIZE}` +
+      `DATE: ${todayDate} MARCH 2026\n\n` +
+      `${scanCodeCommand}` + // <--- FIX: Changed from nativeQRCode to scanCodeCommand
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+      `${otherTokensStr}` +
+      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
+      `${FF}${CUT}`;
     // }
 
-     if (printBagLabels) {
+    if (printBagLabels) {
       for (let i = 0; i < bagCount; i++) {
         let currentToken = firstTokenNum + i;
         let bagBigToken = String(currentToken);
