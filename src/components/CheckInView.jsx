@@ -38,7 +38,17 @@ export default function CheckInView() {
         // }
 
         try {
-          printTokens(data.tokenId, name, mobile, city, bagCount, data.mode);
+          printTokens(
+            data.tokenId,
+            name,
+            mobile,
+            city,
+            bagCount,
+            data.mode,
+            data.printBagLabels,
+            data.enablePageCut,
+            data.useQrCode,
+          );
         } catch (err) {
           console.log("Printing skipped");
         }
@@ -101,7 +111,7 @@ export default function CheckInView() {
     if (!successData) return;
 
     const dateCode = new Date().getDate();
-    const displayToken = `${dateCode}-${String(successData.tokenId).padStart(4, "0")}`;
+    const displayToken = `${String(successData.tokenId).padStart(4, "0")}`;
 
     // 1. Format the token correctly
     const { tokenId, name, mobile, bagCount } = successData;
@@ -136,7 +146,7 @@ export default function CheckInView() {
 
   if (successData) {
     const dateCode = new Date().getDate();
-    const displayToken = `${dateCode}-${String(successData.tokenId).padStart(4, "0")}`;
+    const displayToken = `${String(successData.tokenId).padStart(4, "0")}`;
 
     return (
       <div className="bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md mx-auto border-2 border-green-500/50 text-center">
@@ -188,7 +198,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 2.10
+        Pune Cloakroom 3.2
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -259,7 +269,7 @@ export default function CheckInView() {
 
 // Ensure printTokens is defined globally or inside the same file
 const printTokens = (
-  startTokenId,
+  startTokenId, // e.g., "9-0094"
   name,
   mobile,
   city,
@@ -267,10 +277,10 @@ const printTokens = (
   mode = "PER_MAHATMA",
   printBagLabels = true,
   enablePageCut = false,
+  useQrCode = false, // <--- NEW PARAMETER
 ) => {
-  // --- PERFECT PROPORTIONAL SIZES ---
-  const MAX_SIZE = "\x1D\x21\x33"; // 4x Width & 4x Height (Massive & Square)
-  const JUMBO = "\x1D\x21\x11"; // 2x Width & 2x Height (Safe)
+  const MAX_SIZE = "\x1D\x21\x33";
+  const JUMBO = "\x1D\x21\x11";
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
 
   const BOLD_ON = "\x1BE\x01";
@@ -279,48 +289,87 @@ const printTokens = (
   const FF = "\x0C";
   const CUT = enablePageCut ? "\x1D\x56\x00" : "";
 
-  // --- SAFE BARCODE COMMANDS ---
-  const BARCODE_HEIGHT = "\x1D\x68\x40";
-  const BARCODE_WIDTH = "\x1D\x77\x04";
-  const BARCODE_TEXT_OFF = "\x1D\x48\x00";
-
   const todayDate = new Date().getDate();
   let fullPrint = "";
 
-  const firstTokenNum = Number(startTokenId);
-  const cleanToken = String(firstTokenNum).padStart(4, "0");
+  // ==========================================
+  // FORMAT CONVERTER & EXTRACTOR
+  // ==========================================
+  let prefix = String(todayDate);
+  let baseNumberStr = String(startTokenId);
+
+  if (baseNumberStr.includes("-")) {
+    const parts = baseNumberStr.split("-");
+    prefix = parts[0];
+    baseNumberStr = parts[1];
+  }
+
+  const safeNumberStr = baseNumberStr.replace(/\D/g, "");
+  const firstTokenNum = Number(safeNumberStr) || 0;
   const bigToken = String(firstTokenNum);
 
-  const safeBarcode = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${cleanToken}\x00`;
+  const pureFourDigitToken = String(firstTokenNum).padStart(4, "0"); // "0094"
+  const qrDataString = `${prefix}-${pureFourDigitToken}`; // "9-0094"
+
+  // ==========================================
+  // DYNAMIC CODE GENERATOR (BARCODE vs QR)
+  // ==========================================
+  let scanCodeCommand = "";
+  const lightPayload = bigToken;
+
+  if (useQrCode) {
+    // Heavy QR Code Generation
+    const dataLen = lightPayload.length + 3;
+    const pL = String.fromCharCode(dataLen % 256);
+    const pH = String.fromCharCode(Math.floor(dataLen / 256));
+
+    const qrSize = "\x1D\x28\x6B\x03\x00\x31\x43\x06";
+    const qrError = "\x1D\x28\x6B\x03\x00\x31\x45\x31";
+    const qrStore = `\x1D\x28\x6B${pL}${pH}\x31\x50\x30${lightPayload}`;
+    const qrPrint = "\x1D\x28\x6B\x03\x00\x31\x51\x30";
+
+    // THE DOT-FEED FIX:
+    // \x1B\x4A is the command for "Feed Paper by Dots".
+    // \x1E is the hexadecimal number for 30 dots (exactly half of a normal \n line).
+    const halfLineFeed = "\x1B\x4A\x1E";
+
+    scanCodeCommand = `${qrSize}${qrError}${qrStore}${qrPrint}${halfLineFeed}`;
+  } else {
+    // Ultra-Safe 1D Barcode (CODE39)
+    const BARCODE_HEIGHT = "\x1D\x68\x40";
+    const BARCODE_WIDTH = "\x1D\x77\x04";
+    const BARCODE_TEXT_OFF = "\x1D\x48\x00";
+
+    // FIX: Added the " \n \n" right after the \x00 terminator!
+    // This forces the printer to physically roll the paper down after the barcode.
+    scanCodeCommand = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${lightPayload}\x00 \n \n\n`;
+  }
 
   if (mode === "PER_MAHATMA") {
-    // --- A. MASTER MAHATMA TOKEN ---
-    fullPrint +=
-      `${CENTER}${NORMAL_SIZE}Pune Cloakroom 2026\n` +
-      `DATE: ${todayDate} MARCH 2026\n` +
-      `--------------------------------\n` +
-      `${safeBarcode}\n` +
-      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
-      `--------------------------------\n` +
-      `Keep token safe!\n` +
-      `${FF}${CUT}`;
+    // --- A. MASTER MAHATMA TOKEN (TESTING: 3 COPIES) ---
+    for (let testLoop = 0; testLoop < 3; testLoop++) {
+      fullPrint +=
+        `${CENTER}${NORMAL_SIZE}` +
+        `\n DATE: ${todayDate} MARCH 2026\n\n` +
+        `${scanCodeCommand}` + // Dynamically injects Barcode OR QR
+        `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+        `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n\n` +
+        `${FF}${CUT}`;
+    }
 
-    // --- B. INDIVIDUAL BAG LABELS ---
+    // --- B. INDIVIDUAL BAG LABELS (Temporarily active for testing layout) ---
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          // Using " \n" (Space + Newline) forces the printer to roll the paper!
           `${CENTER} \n \n \n` +
           `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
           `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
           `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
-          ` \n \n` + // Forced bottom margin to trigger gap sensor perfectly
+          ` \n \n` +
           `${FF}${CUT}`;
       }
     }
   }
-
   // ==========================================
   // MODE 2: TOKEN PER BAG (Individual Mode)
   // ==========================================
@@ -329,23 +378,26 @@ const printTokens = (
     if (bagCount > 1) {
       const otherTokens = [];
       for (let i = 1; i < bagCount; i++) {
-        otherTokens.push(String(firstTokenNum + i).padStart(4, "0"));
+        otherTokens.push(
+          `${prefix}-${String(firstTokenNum + i).padStart(4, "0")}`,
+        );
       }
       otherTokensStr = `& ${otherTokens.join(",")}\n`;
     }
 
-    fullPrint +=
-      `${CENTER}${BOLD_ON}Pune Cloakroom 2026${BOLD_OFF}\n` +
-      `DATE: ${todayDate} MARCH 2026\n` +
-      `--------------------------------\n` +
-      `${safeBarcode}\n` +
-      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-      `${otherTokensStr}` +
-      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n` +
-      `--------------------------------\n` +
-      `Keep token safe!\n${FF}`;
+    // Printing this 3 times for your test as well
+    for (let testLoop = 0; testLoop < 3; testLoop++) {
+      fullPrint +=
+        `${CENTER}${NORMAL_SIZE}` +
+        `DATE: ${todayDate} MARCH 2026\n\n` +
+        `${scanCodeCommand}` + // <--- FIX: Changed from nativeQRCode to scanCodeCommand
+        `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+        `${otherTokensStr}` +
+        `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
+        `${FF}${CUT}`;
+    }
 
-    if (printBagLabels) {
+     if (printBagLabels) {
       for (let i = 0; i < bagCount; i++) {
         let currentToken = firstTokenNum + i;
         let bagBigToken = String(currentToken);

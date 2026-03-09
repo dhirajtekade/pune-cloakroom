@@ -2,7 +2,7 @@ export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 
-// --- HELPER FUNCTION: Updated to accept the final message directly ---
+// --- HELPER FUNCTION: Send SMS ---
 async function sendCloakroomSMS(mobileNumber, finalMessage) {
   const apiKey = process.env.FAST2SMS_API_KEY;
 
@@ -22,7 +22,7 @@ async function sendCloakroomSMS(mobileNumber, finalMessage) {
       },
       body: JSON.stringify({
         route: "q",
-        message: finalMessage, // Use the dynamic message passed from the route
+        message: finalMessage,
         language: "english",
         flash: 0,
         numbers: cleanNumber,
@@ -36,30 +36,6 @@ async function sendCloakroomSMS(mobileNumber, finalMessage) {
     return false;
   }
 }
-
-// async function sendWhatsApp(mobileNumber, finalMessage) {
-//   const apiKey = process.env.FAST2SMS_API_KEY;
-//   const cleanNumber = mobileNumber.replace(/\D/g, "").slice(-10);
-
-//   try {
-//     const response = await fetch("https://www.fast2sms.com/dev/whatsappV1", {
-//       method: "POST",
-//       headers: {
-//         authorization: apiKey,
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({
-//         instance_id: "YOUR_INSTANCE_ID", // You get this from Fast2SMS WhatsApp Panel
-//         type: "text",
-//         number: "91" + cleanNumber,
-//         message: finalMessage,
-//       }),
-//     });
-//     return (await response.json()).success;
-//   } catch (error) {
-//     return false;
-//   }
-// }
 
 const shareToWhatsApp = (mobile, tokenId, name, bagCount) => {
   const formattedToken = `#${String(tokenId).padStart(4, "0")}`;
@@ -86,17 +62,16 @@ export async function POST(request) {
     const { name, mobile, city, bagCount } = body;
 
     // 1. Fetch settings
-    // Add to your settingResult fetch query:
     const settingResult = await sql`
-  SELECT key, value FROM settings 
-  WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut', 'print_as_image')
-`;
+      SELECT key, value FROM settings 
+      WHERE key IN ('system_mode', 'sms_template', 'print_bag_labels', 'enable_page_cut', 'print_as_image', 'use_qr_code')
+    `;
 
     let printBagLabels = "true";
-    let enablePageCut = "false"; // New variable
+    let enablePageCut = "false";
     let printAsImage = "false";
     let mode = "PER_MAHATMA";
-
+    let useQrCode = "false";
     let smsTemplate =
       "JSCA {{name}}, Token: {{tokenId}} for {{bagCount}} bags.";
 
@@ -104,60 +79,65 @@ export async function POST(request) {
       if (row.key === "system_mode") mode = row.value;
       if (row.key === "sms_template") smsTemplate = row.value;
       if (row.key === "print_bag_labels") printBagLabels = row.value;
-      if (row.key === "enable_page_cut") enablePageCut = row.value; // Map new setting
+      if (row.key === "enable_page_cut") enablePageCut = row.value;
       if (row.key === "print_as_image") printAsImage = row.value;
+      if (row.key === "use_qr_code") useQrCode = row.value;
     });
 
-    // 2. Insert and get Token ID
-    // 1. Get Today's Date String (YYYY-MM-DD)
-    // Inside your POST function in api/checkin/route.js
+    // 2. Get Date Code (e.g., 9 for March 9th)
     const today = new Date();
-    const dateCode = today.getDate(); // e.g., 12
+    const dateCode = today.getDate();
 
-    // 2. Insert and get the count for today to use as a "Daily Token"
+    // 3. Insert and get the pure integer token_id
     const insertResult = await sql`
-  INSERT INTO checkins (name, mobile, city, bag_count, status) 
-  VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED') 
-  RETURNING token_id;
-`;
+      INSERT INTO checkins (name, mobile, city, bag_count, status) 
+      VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED') 
+      RETURNING token_id;
+    `;
     const startTokenId = insertResult[0].token_id;
 
-    // 2. Handle sequence advancement for "PER_BAG"
-    if (mode === "PER_BAG" && bagCount > 1) {
-      // We already used 1 ID for the insert. We need to skip the next (bagCount - 1) IDs.
-      await sql`SELECT setval(
-    pg_get_serial_sequence('checkins', 'token_id'), 
-    nextval(pg_get_serial_sequence('checkins', 'token_id')) + ${bagCount} - 2, 
-    true
-  );`;
-    }
-
-    // 3. Create the Display Token (Date-Token)
+    // 4. Create the final display format (e.g., "9-0093")
     const displayToken = `${dateCode}-${String(startTokenId).padStart(4, "0")}`;
 
-    // 4. Trigger SMS (Corrected Variable Replacement)
-    if (mobile && mobile.length >= 10) {
-      const formattedToken = `#${String(startTokenId).padStart(4, "0")}`;
+    // 5. Save the formatted display_token back into the database
+    await sql`
+      UPDATE checkins 
+      SET display_token = ${displayToken} 
+      WHERE token_id = ${startTokenId};
+    `;
 
+    // 6. Handle sequence advancement for "PER_BAG"
+    if (mode === "PER_BAG" && bagCount > 1) {
+      await sql`SELECT setval(
+        pg_get_serial_sequence('checkins', 'token_id'), 
+        nextval(pg_get_serial_sequence('checkins', 'token_id')) + ${bagCount} - 2, 
+        true
+      );`;
+    }
+
+    // 7. Trigger SMS using the new formatted token
+    if (mobile && mobile.length >= 10) {
       const finalMessage = smsTemplate
         .replace(/{{name}}/g, name)
-        .replace(/{{tokenId}}/g, displayToken) // Now sends 12-0045
-        .replace(/{{bagCount}}/g, (bagCount || 1).toString()); // Ensure it's a string and not empty
+        .replace(/{{tokenId}}/g, displayToken) // Sends "9-0093"
+        .replace(/{{bagCount}}/g, (bagCount || 1).toString());
 
-      // Call with only 2 arguments: mobile and the message
       sendCloakroomSMS(mobile, finalMessage).catch((err) =>
         console.error("Background SMS Error:", err),
       );
     }
 
+    // 8. Return data to frontend
     return NextResponse.json({
       success: true,
-      tokenId: startTokenId,
+      // We pass displayToken as tokenId so the print function gets "9-0093"
+      tokenId: displayToken,
       displayToken: displayToken,
       mode: mode,
       printBagLabels: printBagLabels === "true",
-      enablePageCut: enablePageCut === "true", // Send as boolean
+      enablePageCut: enablePageCut === "true",
       printAsImage: printAsImage === "true",
+      useQrCode: useQrCode === "true",
     });
   } catch (error) {
     console.error("Check-In API Error:", error);

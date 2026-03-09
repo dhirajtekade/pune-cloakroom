@@ -19,6 +19,7 @@ export default function AdminSettings() {
 
   // NEW STATE FOR PAGE CUTTER
   const [enablePageCut, setEnablePageCut] = useState(false);
+  const [useQrCode, setUseQrCode] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(false);
@@ -35,6 +36,7 @@ export default function AdminSettings() {
             fetch("/api/settings?key=print_bag_labels"),
             fetch("/api/settings?key=enable_page_cut"),
             fetch("/api/settings?key=print_as_image"), // <-- ADDED THIS
+            fetch("/api/settings?key=use_qr_code"), // <-- ADDED THIS
           ]);
 
         const modeData = await modeRes.json();
@@ -43,6 +45,7 @@ export default function AdminSettings() {
         const printData = await printRes.json();
         const cutData = await cutRes.json();
         const imgData = await imgRes.json(); // Now imgRes exists!
+        const use_qr_code = await use_qr_code.json(); // Now imgRes exists!
 
         if (modeData.value) setMode(modeData.value);
         if (smsData.value) setSmsTemplate(smsData.value);
@@ -50,6 +53,7 @@ export default function AdminSettings() {
         if (printData.value) setPrintBagLabels(printData.value === "true");
         if (cutData.value) setEnablePageCut(cutData.value === "true");
         if (imgData.value) setPrintAsImage(imgData.value === "true");
+        if (use_qr_code.value) setUseQrCode(use_qr_code.value === "true");
 
         setLoading(false);
       } catch (err) {
@@ -185,6 +189,36 @@ export default function AdminSettings() {
             </div>
             <div
               className={`w-4 h-4 rounded-full ${printAsImage ? "bg-purple-500 shadow-[0_0_10px_rgba(147,51,234,0.8)]" : "bg-gray-700"}`}
+            ></div>
+          </button>
+
+          {/* QR / BARCODE TOGGLE */}
+          <button
+            onClick={() => {
+              const newValue = !useQrCode;
+              setUseQrCode(newValue);
+              updateSetting("use_qr_code", newValue);
+            }}
+            className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+              useQrCode
+                ? "border-pink-600 bg-pink-600/10"
+                : "border-gray-800 bg-gray-900/50 opacity-40"
+            }`}
+          >
+            <div className="text-left flex-grow">
+              <p
+                className={`font-black text-lg uppercase ${useQrCode ? "text-pink-400" : "text-gray-500"}`}
+              >
+                Scan Format: {useQrCode ? "QR Code" : "1D Barcode"}
+              </p>
+              <p className="text-xs text-gray-400 leading-tight">
+                {useQrCode
+                  ? "QR MODE: Best scanning, but may cause some budget printers to hang."
+                  : "BARCODE MODE: 100% stable, ultra-fast printing, never crashes."}
+              </p>
+            </div>
+            <div
+              className={`w-4 h-4 rounded-full ${useQrCode ? "bg-pink-500 shadow-[0_0_10px_rgba(219,39,119,0.8)]" : "bg-gray-700"}`}
             ></div>
           </button>
         </div>

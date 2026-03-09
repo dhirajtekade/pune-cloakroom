@@ -200,7 +200,7 @@ export default function RecordsView() {
                           onClick={() => handleCheckout(record.id)}
                           className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-green-500 active:scale-95 transition-transform"
                         >
-                          CHECKOUT
+                          CHECKOUT / add Partial
                         </button>
                       ) : (
                         <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600">
