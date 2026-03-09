@@ -100,7 +100,7 @@ export default function CheckInView() {
       setIsResending(false);
     }
   };
-  
+
   //whatasapp share
   const shareToWhatsApp = () => {
     if (!successData) return;
@@ -274,6 +274,7 @@ const printTokens = (
   enablePageCut = false,
   useQrCode = false, // <--- NEW PARAMETER
 ) => {
+  const SUPER_GIANT = "\x1D\x21\x55"; // 7x Width & 7x Height (Massive!)
   const MAX_SIZE = "\x1D\x21\x33";
   const JUMBO = "\x1D\x21\x11";
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
@@ -357,8 +358,8 @@ const printTokens = (
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
           `${CENTER} \n \n \n` +
-          `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n` +
+          `${SUPER_GIANT}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n\n` +
+          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n\n` +
           `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
           ` \n \n` +
           `${FF}${CUT}`;
