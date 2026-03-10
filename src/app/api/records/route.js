@@ -2,23 +2,48 @@ export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 
-// Fetch all records for the Records View
-export async function GET() {
+export async function GET(request) {
   try {
     const sql = neon(process.env.DATABASE_URL);
 
-    const records = await sql`
-      SELECT 
-        token_id as id, 
-        name, 
-        mobile,
-        city,
-        bag_count as bags, 
-        status, 
-        to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'HH:MI AM') as time 
-      FROM checkins 
-      ORDER BY created_at DESC;
-    `;
+    // Grab the date from the URL (e.g., ?date=2026-03-10)
+    const { searchParams } = new URL(request.url);
+    const filterDate = searchParams.get("date");
+
+    let records;
+
+    if (filterDate) {
+      // Safely filter by date using IST Timezone conversions
+      records = await sql`
+        SELECT 
+          token_id as id,
+          display_token, 
+          name, 
+          mobile,
+          city,
+          bag_count as bags, 
+          status, 
+          to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'HH:MI AM') as time 
+        FROM checkins 
+        WHERE DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') = ${filterDate}::date
+        ORDER BY created_at DESC;
+      `;
+    } else {
+      // Fallback if no date is provided
+      records = await sql`
+        SELECT 
+          token_id as id,
+          display_token, 
+          name, 
+          mobile,
+          city,
+          bag_count as bags, 
+          status, 
+          to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'HH:MI AM') as time 
+        FROM checkins 
+        ORDER BY created_at DESC LIMIT 100;
+      `;
+    }
 
     return NextResponse.json({ records });
   } catch (error) {
@@ -36,13 +61,6 @@ export async function PUT(request) {
     const sql = neon(process.env.DATABASE_URL);
     const { id, action, newBagCount } = await request.json();
 
-    // if (action === "RETURN") {
-    //   await sql`UPDATE checkins SET status = 'RETURNED' WHERE token_id = ${id}`;
-    // } else if (action === "EDIT_BAGS") {
-    //   await sql`UPDATE checkins SET bag_count = ${newBagCount} WHERE token_id = ${id}`;
-    // }
-
-    // Inside your PUT function
     if (action === "REQUEST_PICKUP") {
       await sql`UPDATE checkins SET updated_at = NOW() WHERE token_id = ${id}`;
     } else if (action === "FINAL_CHECKOUT") {

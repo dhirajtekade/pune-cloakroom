@@ -3,8 +3,6 @@ import { useState, useEffect } from "react";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
-  CheckCircleIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 
 export default function RecordsView() {
@@ -12,46 +10,53 @@ export default function RecordsView() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Add this line to fix the crash
-  const isAdmin = true; // Set to true for now so you can see the delete buttons
+  const isAdmin = true;
+
+  // Calculate today's date in YYYY-MM-DD format
+  const getTodayString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const [filterDate, setFilterDate] = useState(getTodayString());
 
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/records");
+      // Pass the date filter to the API
+      const res = await fetch(`/api/records?date=${filterDate}`);
       const data = await res.json();
       setRecords(data.records || []);
     } catch (err) {
-      console.error("Fetch error");
+      console.error("Fetch error", err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Trigger fetch when the component mounts AND whenever filterDate changes
   useEffect(() => {
     fetchRecords();
-
-
-  }, []);
+  }, [filterDate]);
 
   // Summary Logic
-  // Summary Logic - Updated with correct DB keys
-
-  console.log("rec:", records);
   const stats = {
     totalVisitors: records.length,
-    activeBags: records.filter(
-      (rec) => rec.status === "STORED").length,
+    activeBags: records.filter((rec) => rec.status === "STORED").length,
     checkedOut: records.filter(
       (rec) => rec.status === "COLLECTED" || rec.status === "RETURNED",
     ).length,
   };
 
-  // Search Logic - Updated to look for token_id
+  // Search Logic
   const filteredRecords = records.filter(
     (rec) =>
       rec.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rec.mobile?.includes(searchTerm) ||
+      rec.display_token?.includes(searchTerm) || // Search by the formatted token!
       rec.id?.toString().includes(searchTerm),
   );
 
@@ -67,7 +72,6 @@ export default function RecordsView() {
 
       const data = await res.json();
       if (data.success) {
-        // Refresh the records so the button disappears and status changes
         fetchRecords();
       } else {
         alert("Error: " + data.error);
@@ -97,7 +101,6 @@ export default function RecordsView() {
             {stats.activeBags}
           </p>
         </div>
-
         <div className="bg-white p-4 rounded-2xl shadow-sm border-b-4 border-green-500 text-center">
           <p className="text-gray-500 text-xs font-black uppercase tracking-widest">
             Returned
@@ -108,21 +111,37 @@ export default function RecordsView() {
         </div>
       </div>
 
-      {/* 2. Search and Refresh */}
-      <div className="flex gap-4 mb-6">
+      {/* 2. Controls: Date, Search, and Refresh */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        {/* Date Filter */}
+        <div className="flex items-center gap-3 bg-white px-4 py-2 border border-gray-200 rounded-xl shadow-sm">
+          <label className="text-gray-400 font-bold uppercase text-xs">
+            Date:
+          </label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="text-gray-900 font-bold outline-none cursor-pointer bg-transparent"
+          />
+        </div>
+
+        {/* Search Input */}
         <div className="relative flex-grow">
           <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by Token, Name, or Mobile..."
+            placeholder="Search Token, Name, Mobile..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
           />
         </div>
+
+        {/* Refresh Button */}
         <button
           onClick={fetchRecords}
-          className="p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50"
+          className="p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm"
         >
           <ArrowPathIcon
             className={`h-6 w-6 text-blue-600 ${loading ? "animate-spin" : ""}`}
@@ -154,77 +173,70 @@ export default function RecordsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredRecords.map((record, i) => {
-                // 1. Calculate the Daily Token (e.g., 8-0045) to match the printed tag
-                const recordDate = record.created_at
-                  ? new Date(record.created_at).getDate()
-                  : "??";
-                const displayToken = `${recordDate}-${String(record.token_id).padStart(4, "0")}`;
+              {filteredRecords.map((record) => (
+                <tr
+                  key={record.id}
+                  className={`hover:bg-blue-50/30 transition-colors ${
+                    record.status === "COLLECTED" ||
+                    record.status === "RETURNED"
+                      ? "opacity-50 grayscale bg-gray-50/50"
+                      : ""
+                  }`}
+                >
+                  {/* Safely display the pre-formatted token straight from the database */}
+                  <td className="p-4 font-black text-xl text-blue-600">
+                    #{record.display_token || record.id}
+                  </td>
 
-                return (
-                  <tr
-                    key={record.id}
-                    className={`hover:bg-blue-50/30 transition-colors ${
-                      record.status === "COLLECTED"
-                        ? "opacity-50 grayscale bg-gray-50/50"
-                        : ""
-                    }`}
-                  >
-                    {/* 1. Display the formatted Date-Token */}
-                    <td className="p-4 font-black text-xl text-blue-600">
-                      #{record.id}
-                    </td>
+                  <td className="p-4">
+                    <p className="font-bold text-gray-900 uppercase">
+                      {record.name || "Unknown"}
+                    </p>
+                    <p className="text-xs text-gray-500">{record.mobile}</p>
+                  </td>
 
-                    <td className="p-4">
-                      <p className="font-bold text-gray-900 uppercase">
-                        {record.name || "Unknown"}
-                      </p>
-                      <p className="text-xs text-gray-500">{record.mobile}</p>
-                    </td>
+                  <td className="p-4 text-center">
+                    <span className="inline-block px-3 py-1 bg-gray-100 rounded-lg font-black text-gray-700">
+                      {record.bags || 0}
+                    </span>
+                  </td>
 
-                    {/* 2. Bag Count (Ensure it matches your DB column name) */}
-                    <td className="p-4 text-center">
-                      <span className="inline-block px-3 py-1 bg-gray-100 rounded-lg font-black text-gray-700">
-                        {record.bags || 0}
+                  <td className="p-4 text-sm font-bold text-gray-600">
+                    {record.time}
+                  </td>
+
+                  <td className="p-4 text-right">
+                    {record.status === "STORED" ? (
+                      <button
+                        onClick={() => handleCheckout(record.id)}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-green-500 active:scale-95 transition-transform shadow-md"
+                      >
+                        CHECKOUT
+                      </button>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600">
+                        {record.status}
                       </span>
-                    </td>
-
-                    {/* 3. Time formatting */}
-                    <td className="p-4 text-sm font-bold text-gray-600">
-                      {record.time}
-                    </td>
-
-                    <td className="p-4 text-right">
-                      {record.status === "STORED" ? (
-                        <button
-                          onClick={() => handleCheckout(record.id)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-green-500 active:scale-95 transition-transform"
-                        >
-                          CHECKOUT / add Partial
-                        </button>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600">
-                          {record.status}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
         {filteredRecords.length === 0 && !loading && (
           <div className="p-20 text-center text-gray-400 font-bold italic">
-            No matching records found.
+            No matching records found for this date.
           </div>
         )}
 
         {isAdmin && (
-          <button className="text-red-600 text-xs font-bold">
-            Delete Record
-          </button>
+          <div className="p-4 text-right border-t border-gray-100 bg-gray-50">
+            <button className="text-red-600 text-xs font-bold hover:underline">
+              Delete Record
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -174,33 +174,34 @@ export default function AdminSettings() {
             ></div>
           </button>
 
-          {/* IMAGE PRINTING TOGGLE */}
+          {/* IMAGE RENDERING TOGGLE */}
           <button
             onClick={() => {
               const newValue = !printAsImage;
               setPrintAsImage(newValue);
               updateSetting("print_as_image", newValue);
             }}
-            className={`w-full p-5 mt-4 rounded-2xl border-2 flex items-center gap-4 transition-all ${
+            className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${
               printAsImage
-                ? "border-purple-600 bg-purple-600/10"
+                ? "border-pink-600 bg-pink-600/10"
                 : "border-gray-800 bg-gray-900/50 opacity-40"
             }`}
           >
             <div className="text-left flex-grow">
               <p
-                className={`font-black text-lg uppercase ${printAsImage ? "text-purple-400" : "text-gray-500"}`}
+                className={`font-black text-lg uppercase ${printAsImage ? "text-pink-400" : "text-gray-500"}`}
               >
-                Image Rendering Mode
+                Rendering Mode:{" "}
+                {printAsImage ? "Image (Screenshot)" : "Native (ESC/POS)"}
               </p>
               <p className="text-xs text-gray-400 leading-tight">
                 {printAsImage
-                  ? "ON: Bypasses hardware limits. Infinite font sizes & Marathi support."
-                  : "OFF: Uses standard ESC/POS hardware text commands (Faster)."}
+                  ? "IMAGE MODE: Best for giant numbers, perfect scaling, zero squishing. Slightly slower print speed."
+                  : "NATIVE MODE: Ultra-fast printing, lighter on memory, but giant numbers might compress/squish."}
               </p>
             </div>
             <div
-              className={`w-4 h-4 rounded-full ${printAsImage ? "bg-purple-500 shadow-[0_0_10px_rgba(147,51,234,0.8)]" : "bg-gray-700"}`}
+              className={`w-4 h-4 rounded-full ${printAsImage ? "bg-pink-500 shadow-[0_0_10px_rgba(219,39,119,0.8)]" : "bg-gray-700"}`}
             ></div>
           </button>
 
