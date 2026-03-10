@@ -3,12 +3,18 @@ import { useState, useEffect } from "react";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
+  XMarkIcon, // <-- Added for the modal close button
 } from "@heroicons/react/24/outline";
 
 export default function RecordsView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // --- PARTIAL CHECKOUT STATES ---
+  const [partialModal, setPartialModal] = useState(null); // Stores the record being edited
+  const [selectedBags, setSelectedBags] = useState([]); // Array of checked bag indices
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const isAdmin = true;
 
@@ -61,7 +67,7 @@ export default function RecordsView() {
   );
 
   const handleCheckout = async (tokenId) => {
-    if (!confirm(`Checkout Token #${tokenId}?`)) return;
+    if (!confirm(`Checkout ALL bags for Token #${tokenId}?`)) return;
 
     try {
       const res = await fetch("/api/checkout", {
@@ -81,8 +87,121 @@ export default function RecordsView() {
     }
   };
 
+  // --- PARTIAL CHECKOUT LOGIC ---
+  const openPartialModal = (record) => {
+    setPartialModal(record);
+    setSelectedBags([]); // Reset checkboxes when opening
+  };
+
+  const toggleBag = (index) => {
+    if (selectedBags.includes(index)) {
+      setSelectedBags(selectedBags.filter((i) => i !== index));
+    } else {
+      setSelectedBags([...selectedBags, index]);
+    }
+  };
+
+  const confirmPartialCheckout = async () => {
+    if (selectedBags.length === 0) {
+      alert("Please select at least one bag to checkout.");
+      return;
+    }
+
+    setIsUpdating(true);
+    // Math: Total Bags - Checked Bags = Remaining Bags
+    const remainingBags = partialModal.bags - selectedBags.length;
+
+    try {
+      const res = await fetch("/api/records", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: partialModal.id,
+          action: "PARTIAL_CHECKOUT",
+          newBagCount: remainingBags,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setPartialModal(null); // Close modal
+        fetchRecords(); // Refresh table
+      } else {
+        alert("Error updating bags");
+      }
+    } catch (e) {
+      alert("Connection error");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* --- PARTIAL CHECKOUT MODAL --- */}
+      {partialModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-black text-gray-900 uppercase">
+                Partial Checkout
+              </h3>
+              <button
+                onClick={() => setPartialModal(null)}
+                className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+              >
+                <XMarkIcon className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            <p className="text-gray-500 font-bold text-sm mb-4">
+              {partialModal.name} has{" "}
+              <span className="text-black">{partialModal.bags} bags</span>.
+              Select the ones they are taking right now:
+            </p>
+
+            <div className="flex flex-col gap-3 mb-6 max-h-60 overflow-y-auto pr-2">
+              {Array.from({ length: partialModal.bags }).map((_, idx) => (
+                <label
+                  key={idx}
+                  className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    selectedBags.includes(idx)
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBags.includes(idx)}
+                    onChange={() => toggleBag(idx)}
+                    className="w-6 h-6 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span
+                    className={`font-black text-lg ${selectedBags.includes(idx) ? "text-blue-700" : "text-gray-700"}`}
+                  >
+                    Bag {idx + 1}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <button
+              onClick={confirmPartialCheckout}
+              disabled={isUpdating || selectedBags.length === 0}
+              className={`w-full p-4 rounded-xl font-black text-white uppercase tracking-wide transition-all ${
+                selectedBags.length > 0 && !isUpdating
+                  ? "bg-blue-600 hover:bg-blue-500 active:scale-95 shadow-lg shadow-blue-500/30"
+                  : "bg-gray-300 cursor-not-allowed"
+              }`}
+            >
+              {isUpdating
+                ? "Updating..."
+                : `Checkout ${selectedBags.length} Bag(s)`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Summary Stats Bar */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-4 rounded-2xl shadow-sm border-b-4 border-blue-500 text-center">
@@ -207,12 +326,24 @@ export default function RecordsView() {
 
                   <td className="p-4 text-right">
                     {record.status === "STORED" ? (
-                      <button
-                        onClick={() => handleCheckout(record.id)}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-black hover:bg-green-500 active:scale-95 transition-transform shadow-md"
-                      >
-                        CHECKOUT
-                      </button>
+                      <div className="flex flex-col gap-2 items-end">
+                        <button
+                          onClick={() => handleCheckout(record.id)}
+                          className="w-28 bg-green-600 text-white px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-green-500 active:scale-95 transition-transform"
+                        >
+                          CHECKOUT ALL
+                        </button>
+
+                        {/* Only show partial button if they have more than 1 bag */}
+                        {record.bags > 1 && (
+                          <button
+                            onClick={() => openPartialModal(record)}
+                            className="w-28 bg-blue-100 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-blue-200 active:scale-95 transition-transform"
+                          >
+                            PARTIAL OUT
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600">
                         {record.status}
