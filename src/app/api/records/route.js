@@ -57,9 +57,11 @@ export async function GET(request) {
 
 // Handle Check-Outs OR Bag Edits
 // Handle Check-Outs OR Bag Edits
+// Handle Check-Outs OR Bag Edits
 export async function PUT(request) {
   try {
     const sql = neon(process.env.DATABASE_URL);
+    // Note: 'id' might be null during an End of Day sweep, which is fine!
     const { id, action, newBagCount } = await request.json();
 
     if (action === "REQUEST_PICKUP") {
@@ -67,13 +69,19 @@ export async function PUT(request) {
     } else if (action === "FINAL_CHECKOUT") {
       await sql`UPDATE checkins SET status = 'RETURNED', updated_at = NULL WHERE token_id = ${id}`;
     } else if (action === "PARTIAL_CHECKOUT") {
-      // If they check out all remaining bags, mark as RETURNED
       if (newBagCount <= 0) {
         await sql`UPDATE checkins SET status = 'RETURNED', bag_count = 0, updated_at = NULL WHERE token_id = ${id}`;
       } else {
-        // Otherwise, just update the bag count
         await sql`UPDATE checkins SET bag_count = ${newBagCount} WHERE token_id = ${id}`;
       }
+    }
+    // --- NEW: END OF DAY SWEEP ---
+    else if (action === "END_OF_DAY") {
+      await sql`
+        UPDATE checkins 
+        SET status = 'RETURNED', bag_count = 0, updated_at = NOW() 
+        WHERE status = 'STORED'
+      `;
     }
 
     return NextResponse.json({ success: true });

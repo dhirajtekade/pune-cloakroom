@@ -76,6 +76,35 @@ export default function AdminSettings() {
     fetchSettings();
   }, []);
 
+  const handleEndOfDaySweep = async () => {
+    // Strict confirmation to prevent accidental clicks!
+    const confirmation = prompt(
+      "WARNING: This will check out ALL remaining bags currently inside the cloakroom.\n\nType 'CONFIRM' to proceed:",
+    );
+
+    if (confirmation !== "CONFIRM") {
+      alert("End of Day sweep cancelled.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/records", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "END_OF_DAY" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert("Success! All remaining bags have been marked as RETURNED.");
+      } else {
+        alert("Failed to run sweep.");
+      }
+    } catch (err) {
+      alert("Connection error during End of Day sweep.");
+    }
+  };
+
   const updateSetting = async (key, value) => {
     await fetch("/api/settings", {
       method: "POST",
@@ -321,7 +350,7 @@ export default function AdminSettings() {
         <div className="space-y-4">
           <div className="flex justify-between items-end px-1">
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
-              SMS Notification Message
+              Checkin SMS Template
             </p>
             {saveStatus && (
               <span className="text-[10px] font-bold text-green-500 flex items-center gap-1">
@@ -366,18 +395,63 @@ export default function AdminSettings() {
         </div>
 
         {/* CHECKOUT SMS TEMPLATE */}
+        {/* CHECKOUT SMS TEMPLATE */}
         <div className="space-y-4 mt-8">
-          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">
             Checkout SMS Template
           </p>
-          <textarea
-            value={checkoutTemplate}
-            onChange={(e) => setCheckoutTemplate(e.target.value)}
-            onBlur={() =>
-              updateSetting("checkout_sms_template", checkoutTemplate)
-            }
-            className="w-full bg-gray-900 border-2 border-gray-800 rounded-2xl p-4 text-white h-24"
-          />
+          <div className="bg-gray-900/50 border-2 border-gray-800 rounded-2xl p-4 focus-within:border-blue-600 transition-colors">
+            <div className="flex items-start gap-3 mb-3">
+              <ChatBubbleLeftRightIcon className="h-5 w-5 text-gray-400 mt-1" />
+              <textarea
+                value={checkoutTemplate}
+                onChange={(e) => setCheckoutTemplate(e.target.value)}
+                onBlur={() =>
+                  updateSetting("checkout_sms_template", checkoutTemplate)
+                }
+                placeholder="Type your Checkout SMS content..."
+                className="w-full bg-transparent outline-none text-sm text-white resize-none h-24 leading-relaxed"
+              />
+            </div>
+
+            {/* HELPER CHIPS FOR CHECKOUT */}
+            <div className="pt-3 border-t border-gray-800">
+              <p className="text-[9px] font-bold text-gray-600 uppercase mb-2">
+                Available Tags (Tap to copy/use):
+              </p>
+              <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                {["{{name}}", "{{tokenId}}", "{{bagCount}}"].map((tag) => (
+                  <span
+                    key={tag}
+                    className="bg-gray-800 text-blue-400 px-2 py-1 rounded border border-gray-700"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================== */}
+        {/* DANGER ZONE: END OF DAY */}
+        {/* ========================================== */}
+        <div className="mt-12 pt-8 border-t border-gray-800">
+          <h3 className="text-xl font-black text-red-500 mb-4 uppercase tracking-widest">
+            Danger Zone
+          </h3>
+          <button
+            onClick={handleEndOfDaySweep}
+            className="w-full p-6 rounded-2xl border-2 border-red-900 bg-red-950/30 hover:bg-red-900/50 flex flex-col items-center justify-center gap-2 transition-all group"
+          >
+            <p className="font-black text-2xl uppercase text-red-500 group-hover:text-red-400 transition-colors">
+              Run End of Day Sweep
+            </p>
+            <p className="text-sm text-red-700 font-bold max-w-sm text-center">
+              Instantly checks out every single bag left in the system. Cannot
+              be undone.
+            </p>
+          </button>
         </div>
       </div>
     </div>

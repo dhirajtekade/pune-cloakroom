@@ -37,24 +37,6 @@ async function sendCloakroomSMS(mobileNumber, finalMessage) {
   }
 }
 
-// const shareToWhatsApp = (mobile, tokenId, name, bagCount) => {
-//   const formattedToken = `#${String(tokenId).padStart(4, "0")}`;
-
-//   // Professional, clear text message
-//   const text =
-//     `*SAMAN GHAR TOKEN*%0A%0A` +
-//     `Jai Satchitanand!%0A` +
-//     `Name: *${name}*%0A` +
-//     `Token: *${formattedToken}*%0A` +
-//     `Bags: *${bagCount}*%0A%0A` +
-//     `Please show this message or the paper slip to collect your bags.`;
-
-//   // Standard WhatsApp Web/App Link
-//   const url = `https://wa.me/91${mobile.replace(/\D/g, "")}?text=${text}`;
-
-//   window.open(url, "_blank");
-// };
-
 export async function POST(request) {
   try {
     const sql = neon(process.env.DATABASE_URL);
@@ -86,42 +68,55 @@ export async function POST(request) {
       if (row.key === "enable_auto_sms") enableAutoSms = row.value;
     });
 
-    // 2. Get Date Code (e.g., 9 for March 9th)
-    const today = new Date();
-    const dateCode = today.getDate();
+    // 2. Get Date Code (Safely explicitly locked to India Standard Time)
+    const dateCodeStr = new Date().toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+    });
+    const dateCode = parseInt(dateCodeStr, 10);
 
-    // 3. Insert and get the pure integer token_id
-    const insertResult = await sql`
-      INSERT INTO checkins (name, mobile, city, bag_count, status) 
-      VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED') 
-      RETURNING token_id;
-    `;
-    const startTokenId = insertResult[0].token_id;
-
-    // 4. Create the final display format (e.g., "9-0093")
-    const displayToken = `${dateCode}-${String(startTokenId).padStart(4, "0")}`;
-
-    // 5. Save the formatted display_token back into the database
-    await sql`
-      UPDATE checkins 
-      SET display_token = ${displayToken} 
-      WHERE token_id = ${startTokenId};
+    // 3. CALCULATE DAILY SEQUENCE: Look for the highest token from TODAY
+    const datePrefix = `${dateCode}-`;
+    const seqResult = await sql`
+      SELECT display_token, bag_count
+      FROM checkins
+      WHERE display_token LIKE ${datePrefix || ""} || '%'
+      ORDER BY created_at DESC
+      LIMIT 1;
     `;
 
-    // 6. Handle sequence advancement for "PER_BAG"
-    if (mode === "PER_BAG" && bagCount > 1) {
-      await sql`SELECT setval(
-        pg_get_serial_sequence('checkins', 'token_id'), 
-        nextval(pg_get_serial_sequence('checkins', 'token_id')) + ${bagCount} - 2, 
-        true
-      );`;
+    let nextSequence = 1;
+
+    if (seqResult.length > 0 && seqResult[0].display_token) {
+      const parts = seqResult[0].display_token.split("-");
+      if (parts.length === 2) {
+        const lastNumber = parseInt(parts[1], 10);
+        const lastBagCount = parseInt(seqResult[0].bag_count, 10) || 1;
+
+        // If they use PER_BAG mode, we must jump numbers to cover the bags
+        // (e.g., if token 1 takes 3 bags, the next guy gets token 4)
+        if (mode === "PER_BAG") {
+          nextSequence = lastNumber + lastBagCount;
+        } else {
+          nextSequence = lastNumber + 1;
+        }
+      }
     }
 
-    // 7. Trigger SMS using the new formatted token
+    // 4. Create the final display format (e.g., "11-0001")
+    const displayToken = `${dateCode}-${String(nextSequence).padStart(4, "0")}`;
+
+    // 5. Insert directly into the database (Much faster, no 2nd update needed!)
+    await sql`
+      INSERT INTO checkins (name, mobile, city, bag_count, status, display_token) 
+      VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED', ${displayToken}) 
+    `;
+
+    // 6. Trigger SMS ONLY if the Admin toggle is set to true
     if (enableAutoSms === "true" && mobile && mobile.length >= 10) {
       const finalMessage = smsTemplate
         .replace(/{{name}}/g, name)
-        .replace(/{{tokenId}}/g, displayToken) // Sends "9-0093"
+        .replace(/{{tokenId}}/g, displayToken)
         .replace(/{{bagCount}}/g, (bagCount || 1).toString());
 
       sendCloakroomSMS(mobile, finalMessage).catch((err) =>
@@ -129,10 +124,9 @@ export async function POST(request) {
       );
     }
 
-    // 8. Return data to frontend
+    // 7. Return data to frontend
     return NextResponse.json({
       success: true,
-      // We pass displayToken as tokenId so the print function gets "9-0093"
       tokenId: displayToken,
       displayToken: displayToken,
       mode: mode,
