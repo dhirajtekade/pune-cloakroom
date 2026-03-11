@@ -33,7 +33,7 @@ export async function POST(request) {
     // (Added display_token matching just in case the frontend sends "11-0004")
     const result = await sql`
       UPDATE checkins 
-      SET status = 'COLLECTED', updated_at = NOW() 
+      SET status = 'RETURNED', updated_at = NOW() 
       WHERE token_id = ${tokenId} OR display_token = ${tokenId}
       RETURNING name, mobile, bag_count, display_token;
     `;

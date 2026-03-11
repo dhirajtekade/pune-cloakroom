@@ -362,13 +362,13 @@ export default function RecordsView() {
           </div>
         )}
 
-        {isAdmin && (
+        {/* {isAdmin && (
           <div className="p-4 text-right border-t border-gray-100 bg-gray-50">
             <button className="text-red-600 text-xs font-bold hover:underline">
               Delete Record
             </button>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
