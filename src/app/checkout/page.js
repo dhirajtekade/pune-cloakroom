@@ -19,11 +19,15 @@ export default function CheckoutView() {
   const [isPeakHours, setIsPeakHours] = useState(false);
   const inputRef = useRef(null);
 
+  // --- LIVE TIMER FOR 3-MIN WARNING ---
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
   useEffect(() => {
     inputRef.current?.focus();
+    const timer = setInterval(() => setCurrentTime(Date.now()), 5000);
+    return () => clearInterval(timer);
   }, []);
 
-  // --- HELPER: STRIP TO SHORT TOKEN (e.g. "11-0093" -> "93") ---
   const formatShortToken = (displayToken) => {
     if (!displayToken) return "";
     let numStr = displayToken;
@@ -83,22 +87,27 @@ export default function CheckoutView() {
     }
   };
 
+  // --- FIX: UPDATED MANUAL SELECT LOGIC ---
   const handleManualSelect = async (e) => {
     const val = e.target.value;
     setManualToken(val);
 
-    const isMatch = availableTokens.some((t) => {
-      const shortToken = formatShortToken(t.display_token);
-      return shortToken === val || t.token_id.toString() === val;
+    // Now we check if the input EXACTLY matches the new "Token - Name" format
+    const matchedToken = availableTokens.find((t) => {
+      const comboString = `${formatShortToken(t.display_token)} - ${t.name}`;
+      return comboString === val;
     });
 
-    if (isMatch && !isProcessing) {
+    if (matchedToken && !isProcessing) {
       setIsProcessing(true);
       try {
         await fetch("/api/queue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tokenId: val, action: "ADD_TO_QUEUE" }),
+          body: JSON.stringify({
+            tokenId: matchedToken.token_id,
+            action: "ADD_TO_QUEUE",
+          }),
         });
         fetchQueue();
       } catch (err) {
@@ -146,22 +155,24 @@ export default function CheckoutView() {
     }
   };
 
-  // --- NEW HARDCODED COLOR HELPER ---
-  const getTokenStyle = (displayToken) => {
-    const pureNum = parseInt(formatShortToken(displayToken), 10) || 0;
+  const getTokenStyle = (token) => {
+    if (token.updated_at) {
+      const requestedTime = new Date(token.updated_at).getTime();
+      if (currentTime - requestedTime > 180000) {
+        return { backgroundColor: "#dc2626", color: "#ffffff" };
+      }
+    }
 
-    // Group into 100s, wrapping every 500 (0 to 4)
+    const pureNum = parseInt(formatShortToken(token.display_token), 10) || 0;
     const rangeGroup = Math.floor(Math.max(0, pureNum - 1) / 100) % 5;
-
-    // Alternate colors exactly like your old code
     const colorIndex = pureNum % 2 === 0 ? 0 : 1;
 
     const bgCombos = [
-      ["#663300", "#996633"], // first100
-      ["#666666", "#999999"], // second100
-      ["#663366", "#9900CC"], // third100
-      ["#0066CC", "#0099FF"], // four100
-      ["#336600", "#669900"], // five100
+      ["#663300", "#996633"],
+      ["#666666", "#999999"],
+      ["#663366", "#9900CC"],
+      ["#0066CC", "#0099FF"],
+      ["#336600", "#669900"],
     ];
 
     const textCombos = [
@@ -178,11 +189,55 @@ export default function CheckoutView() {
     };
   };
 
+  const getDynamicStyles = (count) => {
+    if (count === 1)
+      return {
+        grid: "grid-cols-1",
+        card: "min-h-[65vh]",
+        token: "text-[50vw] md:text-[35vw] leading-[0.8]",
+        bottomBar: "text-3xl md:text-5xl py-4",
+      };
+    if (count === 2)
+      return {
+        grid: "grid-cols-1 md:grid-cols-2",
+        card: "min-h-[50vh]",
+        token: "text-[35vw] md:text-[22vw] leading-[0.8]",
+        bottomBar: "text-2xl md:text-3xl py-3",
+      };
+    if (count <= 4)
+      return {
+        grid: "grid-cols-2",
+        card: "min-h-[35vh]",
+        token: "text-[28vw] md:text-[15vw] leading-[0.8]",
+        bottomBar: "text-xl md:text-2xl py-2",
+      };
+    if (count <= 6)
+      return {
+        grid: "grid-cols-2 md:grid-cols-3",
+        card: "min-h-[25vh]",
+        token: "text-8xl md:text-[11vw] leading-[0.8]",
+        bottomBar: "text-lg md:text-xl py-2",
+      };
+    if (count <= 8)
+      return {
+        grid: "grid-cols-2 md:grid-cols-4",
+        card: "min-h-[20vh]",
+        token: "text-[20vw] md:text-[8vw] leading-[0.8]",
+        bottomBar: "text-sm md:text-lg py-1.5",
+      };
+    return {
+      grid: "grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
+      card: "min-h-[15vh]",
+      token: "text-[15vw] md:text-[5vw] leading-[0.8]",
+      bottomBar: "text-xs md:text-sm py-1",
+    };
+  };
+
+  const dynamicStyles = getDynamicStyles(queue.length);
+
   return (
     <div className="min-h-screen bg-black p-4 flex flex-col font-sans">
-      {/* --- SINGLE UNIFIED CONTROL TRAY --- */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-3 mb-6 shadow-xl flex flex-col xl:flex-row gap-3 items-center justify-between">
-        {/* 1. Queue Counter Pill */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-3 mb-6 shadow-xl flex flex-col xl:flex-row gap-3 items-center justify-between shrink-0">
         <div className="flex-none bg-gray-800 px-4 py-2 rounded-xl border border-gray-700 flex items-center gap-3 w-full xl:w-auto justify-center">
           <span className="text-gray-400 font-black uppercase text-[10px] tracking-widest">
             Queue
@@ -192,7 +247,6 @@ export default function CheckoutView() {
           </span>
         </div>
 
-        {/* 2. Manual Search / Dropdown */}
         <div className="flex-grow w-full xl:w-1/4 relative">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
           <input
@@ -206,17 +260,17 @@ export default function CheckoutView() {
           />
           <datalist id="stored-tokens">
             {availableTokens.map((t) => (
+              // FIX: Value is now explicitly "Token - Name" so it won't auto-submit until you click it!
               <option
                 key={t.token_id}
-                value={formatShortToken(t.display_token)}
+                value={`${formatShortToken(t.display_token)} - ${t.name}`}
               >
-                {t.name} - {t.mobile}
+                {t.mobile}
               </option>
             ))}
           </datalist>
         </div>
 
-        {/* 3. Hardware Scanner Text Input */}
         <form
           onSubmit={handleScanSubmit}
           className="flex-grow w-full xl:w-1/4 relative"
@@ -234,7 +288,6 @@ export default function CheckoutView() {
           />
         </form>
 
-        {/* 4. Action Buttons & Toggles */}
         <div className="flex flex-wrap md:flex-nowrap gap-2 w-full xl:w-auto shrink-0">
           <button
             onClick={handleCorrectLast}
@@ -270,12 +323,10 @@ export default function CheckoutView() {
               <span
                 className={`text-xs font-bold uppercase tracking-widest select-none ${isPeakHours ? "text-blue-400" : "text-gray-500"}`}
               >
-                Peak Hrs
+                Peak
               </span>
             </label>
-
             <div className="w-px h-5 bg-gray-800"></div>
-
             <button
               onClick={fetchQueue}
               disabled={isProcessing}
@@ -290,34 +341,40 @@ export default function CheckoutView() {
         </div>
       </div>
 
-      {/* --- THE BIG SCREEN QUEUE BOARD --- */}
-      <div className="flex-grow pt-2">
+      <div className="flex-grow flex flex-col">
         {queue.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-800 rounded-3xl opacity-50 bg-gray-900/20">
-            <p className="text-xl font-black text-gray-600 uppercase tracking-widest">
+          <div className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-gray-800 rounded-3xl opacity-50 bg-gray-900/20">
+            <p className="text-2xl font-black text-gray-600 uppercase tracking-widest">
               Awaiting Scans
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div
+            className={`grid ${dynamicStyles.grid} gap-4 transition-all duration-300`}
+          >
             {queue.map((token) => (
               <div
                 key={token.token_id}
                 onDoubleClick={() => handleDoubleClickFinish(token.token_id)}
-                style={getTokenStyle(token.display_token)}
-                className={`rounded-3xl p-6 flex flex-col items-center justify-center text-center shadow-2xl cursor-pointer hover:brightness-110 hover:scale-105 active:scale-95 transition-all select-none border-4 border-black/20`}
+                style={getTokenStyle(token)}
+                className={`relative rounded-3xl flex flex-col justify-between text-center shadow-2xl cursor-pointer hover:brightness-110 hover:scale-105 active:scale-95 transition-all select-none border-4 border-black/20 overflow-hidden ${dynamicStyles.card}`}
                 title="Double-click to mark as RETURNED"
               >
-                {/* Text color is automatically inherited from the style block above! */}
-                <p className="font-bold uppercase tracking-widest text-xs mb-1 drop-shadow-md opacity-90">
-                  {token.bag_count} Bag(s)
-                </p>
-                <h1 className="text-5xl md:text-6xl font-black drop-shadow-lg tracking-tighter">
-                  {formatShortToken(token.display_token) || token.token_id}
-                </h1>
-                <p className="font-bold text-[10px] mt-2 truncate w-full max-w-full uppercase tracking-wider opacity-80">
-                  {token.name}
-                </p>
+                <div className="flex-1 flex items-center justify-center w-full overflow-hidden">
+                  <h1
+                    className={`font-black drop-shadow-lg tracking-tighter w-full text-center ${dynamicStyles.token}`}
+                  >
+                    {formatShortToken(token.display_token) || token.token_id}
+                  </h1>
+                </div>
+
+                <div
+                  className={`w-full bg-black/25 backdrop-blur-sm flex items-center justify-center px-4 ${dynamicStyles.bottomBar}`}
+                >
+                  <p className="font-bold uppercase tracking-widest drop-shadow-md truncate w-full text-white/90">
+                    {token.bag_count} Bag(s) - {token.name}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

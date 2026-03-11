@@ -8,7 +8,7 @@ export async function GET() {
     const sql = neon(process.env.DATABASE_URL);
 
     const queue = await sql`
-      SELECT token_id, display_token, name, bag_count 
+      SELECT token_id, display_token, name, bag_count, updated_at 
       FROM checkins 
       WHERE status = 'REQUESTED' 
       ORDER BY updated_at DESC;
