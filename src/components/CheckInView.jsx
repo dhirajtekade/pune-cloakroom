@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import html2canvas from "html2canvas";
 import {
   PlusIcon,
   MinusIcon,
@@ -30,37 +31,31 @@ export default function CheckInView() {
       const data = await response.json();
 
       if (data.success) {
-        // Trigger Printer (Only works on Android with RawBT)
-        // try {
-        //   printTokens(data.tokenId, name, mobile, city, bagCount, data.mode);
-        // } catch (err) {
-        //   console.log("Printing skipped: Likely on Desktop");
-        // }
-
-        try {
-          printTokens(
-            data.tokenId,
-            name,
-            mobile,
-            city,
-            bagCount,
-            data.mode,
-            data.printBagLabels,
-            data.enablePageCut,
-            data.useQrCode,
-          );
-        } catch (err) {
-          console.log("Printing skipped");
-        }
-
-        setSuccessData({
-          tokenId: data.tokenId,
-          name: name, // Make sure this isn't empty
-          mobile: mobile, // Make sure this isn't empty
-          bagCount: bagCount,
-        });
-
+        // Prepare data for the hidden component tick
         setSuccessData({ tokenId: data.tokenId, name, mobile, bagCount });
+
+        // DYNAMIC PRINTING MODE SELECTOR
+        if (data.printAsImage) {
+          // --- IMAGE MODE ---
+          printAsImageTokens(data.tokenId, data.enablePageCut);
+        } else {
+          // --- NATIVE MODE (Old ESC/POS) ---
+          try {
+            printTokens(
+              data.tokenId,
+              name,
+              mobile,
+              city,
+              bagCount,
+              data.mode,
+              data.printBagLabels,
+              data.enablePageCut,
+              data.useQrCode,
+            );
+          } catch (err) {
+            console.log("Printing skipped");
+          }
+        }
       } else {
         alert("Error: " + data.error);
       }
@@ -70,7 +65,6 @@ export default function CheckInView() {
       setIsLoading(false);
     }
   };
-
   const resendSMS = async () => {
     if (!successData) return;
     setIsResending(true);
@@ -99,6 +93,25 @@ export default function CheckInView() {
     } finally {
       setIsResending(false);
     }
+  };
+
+  const shareToSMS = () => {
+    if (!successData) return;
+
+    const dateCode = new Date().getDate();
+    const displayToken = `${String(successData.tokenId).padStart(4, "0")}`;
+    const { name, mobile, bagCount } = successData;
+
+    // Build the short, clean SMS message
+    const messageText = `JSCA ${name.toUpperCase()},\nToken: ${displayToken} for ${bagCount} bag(s).\nClose time: 09:00PM`;
+
+    // Encode it for the URL
+    const encodedText = encodeURIComponent(messageText);
+
+    // Use the native 'sms:' protocol.
+    // We use _self instead of _blank so the phone knows to open the native app.
+    const url = `sms:+91${mobile}?body=${encodedText}`;
+    window.open(url, "_self");
   };
 
   //whatasapp share
@@ -156,12 +169,23 @@ export default function CheckInView() {
         </p>
 
         <div className="space-y-4">
+          
+
           <button
             onClick={shareToWhatsApp}
             className="w-full p-5 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
           >
             <ChatBubbleLeftRightIcon className="h-7 w-7" />
             SHARE ON WHATSAPP
+          </button>
+
+          {/* NEW NATIVE SMS BUTTON */}
+          <button
+            onClick={shareToSMS}
+            className="w-full p-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
+          >
+            <ChatBubbleLeftRightIcon className="h-7 w-7" />
+            SEND NATIVE SMS (Personal)
           </button>
 
           {/* NEW RESEND SMS BUTTON */}
@@ -175,7 +199,7 @@ export default function CheckInView() {
             }`}
           >
             <ChatBubbleLeftRightIcon className="h-5 w-5" />
-            {isResending ? "SENDING..." : "RESEND SMS"}
+            {isResending ? "SENDING..." : "RESEND SYSTEM SMS"}
           </button>
 
           <button
@@ -190,31 +214,59 @@ export default function CheckInView() {
     );
   }
 
+  // --- ADD THIS RIGHT ABOVE YOUR RETURN STATEMENT ---
+  let displayBigToken = "93"; // Placeholder for the hidden template before a scan
+  let scanPayload = "93";
+
+  if (successData && successData.tokenId) {
+    const baseNumberStr = String(successData.tokenId);
+    let extractedStr = baseNumberStr;
+
+    // Safely extract just "94" from "9-0094"
+    if (baseNumberStr.includes("-")) {
+      extractedStr = baseNumberStr.split("-")[1];
+    }
+    const pureNum = Number(extractedStr.replace(/\D/g, "")) || 0;
+
+    displayBigToken = String(pureNum); // This becomes "94"
+    scanPayload = displayBigToken; // Keeping it lightweight for barcodes
+  }
+
   return (
-    <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800">
+    <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800 mt-1 mb-40">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 3.2
+        Pune Cloakroom 3.10
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
         <div className="flex items-center justify-between border-2 border-gray-700 bg-gray-800 rounded-xl p-2">
           <button
             type="button"
-            onClick={() => setBagCount(Math.max(1, bagCount - 1))}
-            className="bg-gray-700 p-4 rounded-lg text-white"
+            onClick={() =>
+              setBagCount(Math.max(1, (Number(bagCount) || 1) - 1))
+            }
+            className="bg-gray-700 p-4 rounded-lg text-white active:scale-95 transition-transform"
           >
             <MinusIcon className="h-7 w-7" />
           </button>
+
+          {/* FIX: Removed readOnly, added onChange, onFocus, and onBlur */}
           <input
             type="number"
             value={bagCount}
-            readOnly
+            onChange={(e) => {
+              const val = e.target.value;
+              setBagCount(val === "" ? "" : parseInt(val, 10));
+            }}
+            onFocus={(e) => e.target.select()} // Highlights the number instantly when tapped!
+            onBlur={() => setBagCount(Math.max(1, Number(bagCount) || 1))} // Safety net if left blank
             className="w-full text-center text-4xl font-black bg-transparent text-white focus:outline-none"
           />
+
           <button
             type="button"
-            onClick={() => setBagCount(bagCount + 1)}
-            className="bg-blue-600 p-4 rounded-lg text-white"
+            onClick={() => setBagCount((Number(bagCount) || 0) + 1)}
+            className="bg-blue-600 p-4 rounded-lg text-white active:scale-95 transition-transform"
           >
             <PlusIcon className="h-7 w-7" />
           </button>
@@ -258,6 +310,71 @@ export default function CheckInView() {
           <span>{isLoading ? "Saving..." : `Print ${bagCount} Labels`}</span>
         </button>
       </form>
+
+      {/* ======================================================= */}
+      {/* HIDDEN THERMAL LABEL TEMPLATE (ONLY USED FOR IMAGE MODE) */}
+      {/* ======================================================= */}
+      <div
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          top: "0",
+          zIndex: -1000,
+          color: "black",
+          background: "white",
+        }}
+      >
+        <div
+          id="thermal-label-template"
+          className="bg-white text-black flex flex-col items-center justify-between font-sans"
+          style={{
+            width: "576px", // Exact dot-width of an 80mm thermal printer
+            height: "360px", // Exact proportional height for 50mm
+            padding: "20px",
+            boxSizing: "border-box",
+          }}
+        >
+          {/* Header */}
+          <div
+            id="img-date"
+            style={{
+              fontSize: "24px",
+              fontWeight: "bold",
+              textTransform: "uppercase",
+            }}
+          >
+            JSCA SAMAN GHAR
+          </div>
+
+          {/* Middle: The Barcode Placeholder */}
+          <div
+            style={{
+              fontSize: "32px",
+              border: "4px solid black",
+              padding: "10px 20px",
+              marginTop: "20px",
+              fontFamily: "monospace",
+              fontWeight: "bold",
+            }}
+          >
+            <span id="img-scan-payload">Scan Payload: 93</span>
+          </div>
+
+          {/* Bottom: Giant Token */}
+          <div
+            id="img-big-token"
+            style={{
+              fontSize: "150px", // Massive, but safely inside the 360px box!
+              fontWeight: "900",
+              lineHeight: "1",
+              marginTop: "10px",
+            }}
+          >
+            93
+          </div>
+        </div>
+      </div>
+      {/* ======================================================= */}
     </div>
   );
 }
@@ -274,7 +391,7 @@ const printTokens = (
   enablePageCut = false,
   useQrCode = false, // <--- NEW PARAMETER
 ) => {
-  const SUPER_GIANT = "\x1D\x21\x55"; // 7x Width & 7x Height (Massive!)
+  const SUPER_GIANT = "\x1D\x21\x77"; // 7x Width & 7x Height (Massive!)
   const MAX_SIZE = "\x1D\x21\x33";
   const JUMBO = "\x1D\x21\x11";
   const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
@@ -286,6 +403,11 @@ const printTokens = (
   const CUT = enablePageCut ? "\x1D\x56\x00" : "";
 
   const todayDate = new Date().getDate();
+  const displayDate = new Date().toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }).toUpperCase();
   let fullPrint = "";
 
   // ==========================================
@@ -338,7 +460,7 @@ const printTokens = (
 
     // FIX: Added the " \n \n" right after the \x00 terminator!
     // This forces the printer to physically roll the paper down after the barcode.
-    scanCodeCommand = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${lightPayload}\x00 \n \n\n`;
+    scanCodeCommand = `\n ${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${lightPayload}\x00 \n \n`;
   }
 
   if (mode === "PER_MAHATMA") {
@@ -346,7 +468,7 @@ const printTokens = (
     // for (let testLoop = 0; testLoop < 3; testLoop++) {//for testing only
     fullPrint +=
       `${CENTER}${NORMAL_SIZE}` +
-      `\n DATE: ${todayDate} MARCH 2026\n\n` +
+      `\n DATE: ${displayDate}\n` +
       `${scanCodeCommand}` + // Dynamically injects Barcode OR QR
       `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n\n` +
@@ -357,7 +479,7 @@ const printTokens = (
     if (printBagLabels) {
       for (let i = 1; i <= bagCount; i++) {
         fullPrint +=
-          `${CENTER} \n \n \n` +
+          `${CENTER} \n \n\n` +
           `${SUPER_GIANT}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n\n` +
           `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n\n` +
           `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
@@ -383,14 +505,14 @@ const printTokens = (
 
     // Printing this 3 times for your test as well
     // for (let testLoop = 0; testLoop < 3; testLoop++) {
-    fullPrint +=
-      `${CENTER}${NORMAL_SIZE}` +
-      `DATE: ${todayDate} MARCH 2026\n\n` +
-      `${scanCodeCommand}` + // <--- FIX: Changed from nativeQRCode to scanCodeCommand
-      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-      `${otherTokensStr}` +
-      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
-      `${FF}${CUT}`;
+    // fullPrint +=
+    //   `${CENTER}${NORMAL_SIZE}` +
+    //   `DATE: ${todayDate} MARCH 2026\n\n` +
+    //   `${scanCodeCommand}` + // <--- FIX: Changed from nativeQRCode to scanCodeCommand
+    //   `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
+    //   `${otherTokensStr}` +
+    //   `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
+    //   `${FF}${CUT}`;
     // }
 
     if (printBagLabels) {
@@ -413,4 +535,48 @@ const printTokens = (
   const link = document.createElement("a");
   link.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
   link.click();
+};
+
+// --- IMAGE MODE PRINTER (Using html2canvas + RawBT) ---
+// --- IMAGE MODE PRINTER (Using html2canvas + RawBT) ---
+// --- IMAGE MODE PRINTER (Using html2canvas + RawBT) ---
+const printAsImageTokens = async (formattedTokenId, enablePageCut = false) => {
+  const labelElement = document.getElementById("thermal-label-template");
+  if (!labelElement) return;
+
+  // 1. EXTRACT THE NUMBER AND INJECT IT DIRECTLY (Bypasses React delays!)
+  const baseNumberStr = String(formattedTokenId);
+  let displayBigToken = baseNumberStr;
+  if (baseNumberStr.includes("-")) {
+    displayBigToken = baseNumberStr.split("-")[1];
+  }
+  const pureNum = Number(displayBigToken.replace(/\D/g, "")) || 0;
+  displayBigToken = String(pureNum);
+
+  // Directly update the HTML text right before the screenshot
+  document.getElementById("img-scan-payload").innerText =
+    `Scan Payload: ${displayBigToken}`;
+  document.getElementById("img-big-token").innerText = displayBigToken;
+  document.getElementById("img-date").innerText =
+    `JSCA SAMAN GHAR / ${new Date().getDate()} MARCH 2026`;
+
+  try {
+    // 2. Take the screenshot
+    const canvas = await html2canvas(labelElement, {
+      scale: 1,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+
+    // 3. Convert to Data URL
+    const imageDataUrl = canvas.toDataURL("image/png");
+
+    // 4. Send to RawBT
+    const link = document.createElement("a");
+    link.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+    link.click();
+  } catch (err) {
+    console.error("Screenshot error:", err);
+    alert("Image printing failed!");
+  }
 };
