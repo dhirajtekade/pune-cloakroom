@@ -1,9 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
-  XMarkIcon, // <-- Added for the modal close button
+  XMarkIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/outline";
 
 export default function RecordsView() {
@@ -325,30 +327,38 @@ export default function RecordsView() {
                   </td>
 
                   <td className="p-4 text-right">
-                    {record.status === "STORED" ? (
-                      <div className="flex flex-col gap-2 items-end">
-                        <button
-                          onClick={() => handleCheckout(record.id)}
-                          className="w-28 bg-green-600 text-white px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-green-500 active:scale-95 transition-transform"
-                        >
-                          CHECKOUT ALL
-                        </button>
-
-                        {/* Only show partial button if they have more than 1 bag */}
-                        {record.bags > 1 && (
+                    <div className="flex flex-col gap-2 items-end">
+                      {record.status === "STORED" ? (
+                        <>
                           <button
-                            onClick={() => openPartialModal(record)}
-                            className="w-28 bg-blue-100 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-blue-200 active:scale-95 transition-transform"
+                            onClick={() => handleCheckout(record.id)}
+                            className="w-28 bg-green-600 text-white px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-green-500 active:scale-95 transition-transform"
                           >
-                            PARTIAL OUT
+                            CHECKOUT ALL
                           </button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600">
-                        {record.status}
-                      </span>
-                    )}
+                          {record.bags > 1 && (
+                            <button
+                              onClick={() => openPartialModal(record)}
+                              className="w-28 bg-blue-100 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-blue-200 active:scale-95 transition-transform"
+                            >
+                              PARTIAL OUT
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600">
+                          {record.status}
+                        </span>
+                      )}
+
+                      {/* --- NEW: REPRINT BUTTON (Available for all statuses!) --- */}
+                      <Link
+                        href={`/preview/${record.id}`}
+                        className="w-28 bg-gray-800 text-gray-200 border border-gray-700 px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-gray-700 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                        <PrinterIcon className="h-4 w-4" /> REPRINT
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

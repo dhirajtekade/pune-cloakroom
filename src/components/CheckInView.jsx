@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import html2canvas from "html2canvas";
 import {
   PlusIcon,
@@ -8,9 +9,12 @@ import {
   CheckCircleIcon,
   ChatBubbleLeftRightIcon,
   ArrowPathIcon,
+  DocumentMagnifyingGlassIcon,
 } from "@heroicons/react/24/solid";
 
 export default function CheckInView() {
+  const router = useRouter();
+
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
@@ -18,6 +22,8 @@ export default function CheckInView() {
   const [isLoading, setIsLoading] = useState(false);
   const [successData, setSuccessData] = useState(null);
   const [isResending, setIsResending] = useState(false);
+
+  const [submitAction, setSubmitAction] = useState("PRINT");
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
@@ -31,6 +37,12 @@ export default function CheckInView() {
       const data = await response.json();
 
       if (data.success) {
+        // --- NEW LOGIC: IF THEY CLICKED SAVE, REDIRECT IMMEDIATELY ---
+        if (submitAction === "SAVE") {
+          router.push(`/preview/${data.tokenId}`);
+          return; // Stop execution here so it doesn't show the success screen
+        }
+
         // Prepare data for the hidden component tick
         setSuccessData({ tokenId: data.tokenId, name, mobile, bagCount });
 
@@ -169,8 +181,6 @@ export default function CheckInView() {
         </p>
 
         <div className="space-y-4">
-          
-
           <button
             onClick={shareToWhatsApp}
             className="w-full p-5 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
@@ -235,7 +245,7 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800 mt-1 mb-40">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 3.10
+        Pune Cloakroom 4.1
       </h2>
 
       <form onSubmit={handleCheckIn} className="space-y-4">
@@ -308,6 +318,21 @@ export default function CheckInView() {
         >
           <PrinterIcon className="h-7 w-7" />
           <span>{isLoading ? "Saving..." : `Print ${bagCount} Labels`}</span>
+        </button>
+
+        {/* NEW: SAVE & PREVIEW BUTTON */}
+        <button
+          type="submit"
+          onClick={() => setSubmitAction("SAVE")} // Sets action to SAVE
+          disabled={isLoading}
+          className={`w-full p-4 rounded-xl text-lg font-bold text-white flex items-center justify-center space-x-2 active:scale-95 transition-transform ${isLoading ? "bg-gray-600" : "bg-gray-700 hover:bg-gray-600 border border-gray-600"}`}
+        >
+          <DocumentMagnifyingGlassIcon className="h-6 w-6 text-blue-400" />
+          <span>
+            {isLoading && submitAction === "SAVE"
+              ? "Saving..."
+              : `Save & View Preview`}
+          </span>
         </button>
       </form>
 
@@ -403,11 +428,13 @@ const printTokens = (
   const CUT = enablePageCut ? "\x1D\x56\x00" : "";
 
   const todayDate = new Date().getDate();
-  const displayDate = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  }).toUpperCase();
+  const displayDate = new Date()
+    .toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+    .toUpperCase();
   let fullPrint = "";
 
   // ==========================================
