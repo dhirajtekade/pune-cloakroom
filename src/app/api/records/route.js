@@ -1,6 +1,7 @@
 export const runtime = "edge";
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
@@ -25,7 +26,7 @@ export async function GET(request) {
           status, 
           to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'HH:MI AM') as time 
         FROM checkins 
-        WHERE DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') = ${filterDate}::date
+        WHERE DATE(created_at AT TIME ZONE 'Asia/Kolkata') = ${filterDate}::date
         ORDER BY created_at DESC;
       `;
     } else {

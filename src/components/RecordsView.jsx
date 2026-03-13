@@ -34,8 +34,10 @@ export default function RecordsView() {
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      // Pass the date filter to the API
-      const res = await fetch(`/api/records?date=${filterDate}`);
+      // FIX: Added cache: 'no-store' to force Next.js to fetch fresh live data every time!
+      const res = await fetch(`/api/records?date=${filterDate}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
       setRecords(data.records || []);
     } catch (err) {
