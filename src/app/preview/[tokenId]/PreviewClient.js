@@ -5,6 +5,7 @@ import {
   PrinterIcon,
   PhotoIcon,
   DocumentDuplicateIcon,
+  SparklesIcon, // New icon for the hybrid print
 } from "@heroicons/react/24/solid";
 import { useState } from "react";
 import html2canvas from "html2canvas";
@@ -45,7 +46,7 @@ export default function PreviewClient({ tokenData }) {
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${qrData}`;
   const bags = Array.from({ length: tokenData.bag_count || 1 });
 
-  // --- 1. RELIABLE NATIVE PRINT LOGIC (WITH 5 SEC PAUSE) ---
+  // --- 1. RELIABLE NATIVE PRINT LOGIC ---
   const handleNativePrint = async () => {
     setIsPrinting(true);
 
@@ -130,9 +131,61 @@ export default function PreviewClient({ tokenData }) {
     window.print();
   };
 
+  // --- 4. NEW: HYBRID SVG PRINT ---
+  const handleSvgPrint = async () => {
+    setIsPrinting(true);
+    try {
+      // STEP 1: NATIVE MASTER TOKEN
+      const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
+      const MAX_SIZE = "\x1D\x21\x33";
+      const BOLD_ON = "\x1BE\x01";
+      const BOLD_OFF = "\x1BE\x00";
+      const CENTER = "\x1Ba\x01";
+      const FF = "\x0C";
+      const BARCODE_HEIGHT = "\x1D\x68\x40";
+      const BARCODE_WIDTH = "\x1D\x77\x04";
+      const BARCODE_TEXT_OFF = "\x1D\x48\x00";
+
+      const scanCodeCommand = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${bigToken}\x00 \n \n\n`;
+
+      const masterTokenStr =
+        `${CENTER}${NORMAL_SIZE}` +
+        `\n DATE: ${displayDate}\n\n` +
+        `${scanCodeCommand}` +
+        `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+        `${BOLD_ON}${tokenData.bag_count} Bags - ${tokenData.name.toUpperCase()}${BOLD_OFF}\n\n\n\n\n` +
+        `${FF}`;
+
+      const encodedData = btoa(unescape(encodeURIComponent(masterTokenStr)));
+      const nativeLink = document.createElement("a");
+      nativeLink.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+      nativeLink.click();
+
+      // STEP 2: PAUSE 3 SECONDS FOR MASTER TO PRINT
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // STEP 3: SCREENSHOT AND PRINT ALL BAG SVG TOKENS
+      const element = document.getElementById("svg-bag-receipts");
+      if (element) {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+        });
+        const imageDataUrl = canvas.toDataURL("image/png");
+        const imgLink = document.createElement("a");
+        imgLink.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+        imgLink.click();
+      }
+    } catch (err) {
+      alert("Hybrid SVG print failed: " + err.message);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 p-4 md:p-8 flex flex-col items-center">
-      {/* --- CRITICAL: PRINTER DIMENSION SETTINGS FOR WINDOW PRINT --- */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -140,17 +193,8 @@ export default function PreviewClient({ tokenData }) {
           @page { size: 75mm 50mm; margin: 0; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; margin: 0; padding: 0; }
           .page-break { page-break-after: always; break-after: page; }
-          
-          /* This tells the browser to automatically scale the 576px box to fit the 75mm page */
-          .print-container { 
-            width: 75mm !important; 
-            max-width: 75mm !important; 
-          }
-          .print-box {
-            width: 75mm !important;
-            height: 50mm !important;
-            border: none !important;
-          }
+          .print-container { width: 75mm !important; max-width: 75mm !important; }
+          .print-box { width: 75mm !important; height: 50mm !important; border: none !important; }
         }
       `,
         }}
@@ -158,8 +202,18 @@ export default function PreviewClient({ tokenData }) {
 
       {/* --- CONTROLS --- */}
       <div className="w-full max-w-sm flex flex-col gap-3 mb-8 shrink-0 print:hidden">
+        {/* NEW BUTTON: SVG HYBRID PRINT (Prominent) */}
+        <button
+          onClick={handleSvgPrint}
+          disabled={isPrinting}
+          className={`w-full text-white p-5 rounded-xl font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(59,130,246,0.4)] active:scale-95 transition-transform ${isPrinting ? "bg-blue-800 cursor-wait" : "bg-blue-600 hover:bg-blue-500 border-2 border-blue-400"}`}
+        >
+          <SparklesIcon className="h-7 w-7 text-yellow-300" />
+          {isPrinting ? "PRINTING SEQUENCE..." : "SVG PRINT (BEST)"}
+        </button>
+
         {/* Top Row: Back & Native Print */}
-        <div className="flex justify-between gap-3 w-full">
+        <div className="flex justify-between gap-3 w-full mt-2">
           <Link
             href="/"
             className="flex-1 bg-gray-800 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-700 transition-colors"
@@ -189,22 +243,20 @@ export default function PreviewClient({ tokenData }) {
         <button
           onClick={handleImagePrint}
           disabled={isPrinting}
-          className={`w-full text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform ${isPrinting ? "bg-gray-700 cursor-wait" : "bg-blue-900 border border-blue-700 hover:bg-blue-800"}`}
+          className={`w-full text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform ${isPrinting ? "bg-gray-700 cursor-wait" : "bg-gray-800 border border-gray-600 hover:bg-gray-700"}`}
         >
-          <PhotoIcon className="h-5 w-5 text-blue-400" />{" "}
-          {isPrinting ? "PROCESSING..." : "TEST IMAGE PRINT"}
+          <PhotoIcon className="h-5 w-5 text-gray-400" />{" "}
+          {isPrinting ? "PROCESSING..." : "TEST IMAGE PRINT (FULL)"}
         </button>
       </div>
 
       {/* --- PRINTABLE RECEIPT AREA --- */}
-      <div className="w-full overflow-x-auto flex justify-center pb-12 print:pb-0">
-        {/* Added 'print-container' for native window printing */}
+      <div className="w-full overflow-x-auto flex flex-col items-center pb-12 print:pb-0">
         <div
           id="printable-receipt"
           className="bg-[#ffffff] flex flex-col w-[576px] shrink-0 shadow-2xl rounded-sm print:shadow-none print-container"
         >
-          {/* MASTER MAHATMA TOKEN */}
-          {/* Added 'page-break' and 'print-box' */}
+          {/* MASTER MAHATMA TOKEN (Kept 576px wide for Native reference) */}
           <div className="flex flex-col items-center justify-between font-sans w-[576px] h-[384px] p-4 border-b-4 border-dashed border-[#cccccc] overflow-hidden relative box-border page-break print-box">
             <div className="text-xl font-black uppercase tracking-widest mt-2 text-[#000000]">
               {displayDate}
@@ -225,23 +277,51 @@ export default function PreviewClient({ tokenData }) {
               {tokenData.bag_count} BAGS - {tokenData.name}
             </div>
           </div>
+        </div>
 
-          {/* INDIVIDUAL BAG TOKENS */}
+        {/* --- THE SVG BAG TOKENS (LAYOUT E) --- */}
+        {/* We separate this into its own div block so html2canvas only grabs the bags! */}
+        <div
+          id="svg-bag-receipts"
+          className="flex flex-col mt-4 shadow-2xl print:shadow-none"
+        >
           {bags.map((_, index) => (
             <div
               key={`bag-${index}`}
-              className="flex flex-col items-center justify-center font-sans w-[576px] h-[384px] p-4 border-b-4 border-dashed border-[#cccccc] overflow-hidden relative box-border page-break print-box"
+              className="bg-[#ffffff] flex flex-col font-sans w-[800px] h-[850px] box-border relative overflow-hidden text-[#000000] page-break print-box"
             >
-              <div className="text-[180px] font-black leading-none tracking-tighter mt-4 text-[#000000]">
-                {pureNum}
+              {/* Actual Label Content Area (Top 550px) */}
+              <div className="w-full h-[550px] flex flex-col items-center justify-center p-8 border-b-4 border-dashed border-[#cccccc]">
+                <div className="text-center text-5xl font-black uppercase">
+                  {index + 1} / {tokenData.bag_count}
+                </div>
+
+                <div className="flex-grow flex items-center justify-center w-full overflow-hidden my-4">
+                  <svg viewBox="0 0 100 60" className="w-full h-full">
+                    <text
+                      x="60"
+                      y="40"
+                      textAnchor="middle"
+                      fontSize="70"
+                      fontWeight="500"
+                      fill="#000000"
+                      dominantBaseline="middle"
+                    >
+                      {pureNum}
+                    </text>
+                  </svg>
+                </div>
+
+                <div className="text-center text-3xl font-black uppercase tracking-widest mb-4">
+                  {tokenData.mobile} ({tokenData.bag_count}B)
+                </div>
               </div>
 
-              <div className="text-4xl font-black uppercase mt-2 mb-4 text-[#000000]">
-                {index + 1} / {tokenData.bag_count}
-              </div>
-
-              <div className="text-2xl font-black uppercase tracking-wider text-[#000000]">
-                {tokenData.mobile} ({tokenData.bag_count}B)
+              {/* THE PAPER FEED HACK (Bottom 300px) */}
+              <div className="w-full h-[300px] bg-[#ffffff] flex items-end justify-center pb-2">
+                <span style={{ color: "#cccccc" }} className="text-xs">
+                  .
+                </span>
               </div>
             </div>
           ))}

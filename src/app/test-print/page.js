@@ -6,18 +6,17 @@ import {
   ArrowLeftIcon,
   PrinterIcon,
   PhotoIcon,
-  DocumentDuplicateIcon,
 } from "@heroicons/react/24/solid";
 
 export default function TestPrintLab() {
   const [isPrinting, setIsPrinting] = useState(false);
 
-  const pureNum = "93";
+  const pureNum = "209";
   const bagCount = 2;
   const mobile = "9876543210";
 
   // ==========================================
-  // 1. NATIVE PRINT LAB (Added Extra Feed)
+  // 1. NATIVE PRINT LAB (Added 8 Extra Lines)
   // ==========================================
   const handleNativePrint = (hexSizeCode) => {
     const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
@@ -31,7 +30,7 @@ export default function TestPrintLab() {
       `${hexSizeCode}${BOLD_ON}${pureNum}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
       `\x1D\x21\x11(1/${bagCount})${NORMAL_SIZE}\n\n` +
       `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
-      ` \n \n \n \n \n` + // <--- ADDED 3 EXTRA LINE FEEDS HERE TO PUSH THE PAPER OUT
+      ` \n \n \n \n \n \n \n \n` + // <--- 8 LINES FOR MAXIMUM FEED
       `${FF}`;
 
     const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
@@ -81,13 +80,13 @@ export default function TestPrintLab() {
         {/* --- NATIVE PRINTING --- */}
         <div className="bg-gray-800 p-4 rounded-2xl mb-8 border border-gray-700">
           <h2 className="text-lg font-black uppercase text-gray-400 mb-4">
-            1. Native Print (With Extra Feed)
+            1. Native Print (With Massive Feed)
           </h2>
           <button
             onClick={() => handleNativePrint("\x1D\x21\x77")}
             className="w-full bg-green-600 hover:bg-green-500 p-4 rounded-xl font-black shadow-lg flex justify-center items-center gap-2"
           >
-            <PrinterIcon className="h-6 w-6" /> TEST NATIVE + EXTRA PAPER FEED
+            <PrinterIcon className="h-6 w-6" /> TEST NATIVE + 8-LINE FEED
           </button>
         </div>
 
@@ -98,57 +97,61 @@ export default function TestPrintLab() {
           </h2>
 
           <div className="space-y-8">
-            {/* LAYOUT D: Centered & Padded */}
+            {/* LAYOUT E: The Overscale Trick */}
+            {/* LAYOUT E: The Overscale Trick */}
+            {/* LAYOUT E: The Overscale Trick (Tuned) */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="font-bold text-yellow-400">
-                  Layout D: Centered + Bottom Feed
+                  Layout E: Overscaled 800x800 (Top Space + More Scroll)
                 </span>
                 <button
-                  onClick={() => handleImagePrint("layout-d")}
+                  onClick={() => handleImagePrint("layout-e")}
                   className="bg-green-600 px-4 py-2 rounded-lg font-black text-sm flex items-center gap-2 border border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.4)]"
                 >
-                  <PhotoIcon className="h-4 w-4" /> RAWBT D
+                  <PhotoIcon className="h-4 w-4" /> RAWBT E
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mb-2">
-                Notice the extra white space at the bottom to force the printer
-                to roll further.
-              </p>
 
-              <div className="overflow-x-auto bg-gray-950 p-4 rounded-xl">
-                {/* Increased height to 400px and added pb-8 to push everything up slightly and leave a blank tail */}
+              <div className="overflow-x-auto bg-[#111827] p-4 rounded-xl">
+                {/* Total height reduced to 850px to pull back exactly 1 line! */}
                 <div
-                  id="layout-d"
-                  className="bg-[#ffffff] flex flex-col items-center justify-center font-sans w-[576px] h-[400px] pt-4 pb-12 border-4 border-[#000000] box-border relative"
+                  id="layout-e"
+                  className="bg-[#ffffff] flex flex-col font-sans w-[800px] h-[850px] box-border relative overflow-hidden text-[#000000]"
                 >
-                  <div className="text-center text-4xl font-black uppercase text-[#000000] mt-4">
-                    1 / {bagCount}
+                  {/* Actual Label Content Area (Top 550px) */}
+                  <div className="w-full h-[550px] flex flex-col items-center justify-center p-8 border-b-4 border-dashed border-[#cccccc]">
+                    <div className="text-center text-5xl font-black uppercase">
+                      1 / {bagCount}
+                    </div>
+
+                    <div className="flex-grow flex items-center justify-center w-full overflow-hidden my-4">
+                      <svg viewBox="0 0 100 60" className="w-full h-full">
+                        <text
+                          x="60"
+                          y="40"
+                          textAnchor="middle"
+                          fontSize="70"
+                          fontWeight="500"
+                          fill="#000000"
+                          dominantBaseline="middle"
+                        >
+                          {pureNum}
+                        </text>
+                      </svg>
+                    </div>
+
+                    <div className="text-center text-3xl font-black uppercase tracking-widest mb-4">
+                      {mobile} ({bagCount}B)
+                    </div>
                   </div>
 
-                  {/* SVG perfectly centered using dominantBaseline="middle" */}
-                  <div className="flex-grow flex items-center justify-center w-full overflow-hidden my-2">
-                    <svg viewBox="0 0 100 60" className="w-full h-full">
-                      <text
-                        x="50"
-                        y="30"
-                        textAnchor="middle"
-                        fontSize="55"
-                        fontWeight="900"
-                        fill="#000000"
-                        dominantBaseline="middle"
-                      >
-                        {pureNum}
-                      </text>
-                    </svg>
+                  {/* THE PAPER FEED HACK (Reduced to 300px to stay safely inside the current label) */}
+                  <div className="w-full h-[300px] bg-[#ffffff] flex items-end justify-center pb-2">
+                    <span style={{ color: "#cccccc" }} className="text-xs">
+                      .
+                    </span>
                   </div>
-
-                  <div className="text-center text-2xl font-black uppercase tracking-widest text-[#000000]">
-                    {mobile} ({bagCount}B)
-                  </div>
-
-                  {/* Invisible block to enforce bottom padding for the gap sensor */}
-                  <div className="h-8 w-full bg-transparent"></div>
                 </div>
               </div>
             </div>
