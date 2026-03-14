@@ -6,6 +6,7 @@ import {
   ArrowPathIcon,
   XMarkIcon,
   PrinterIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 
 export default function RecordsView() {
@@ -53,9 +54,21 @@ export default function RecordsView() {
   }, [filterDate]);
 
   // Summary Logic
+  // Summary Logic
   const stats = {
     totalVisitors: records.length,
-    activeBags: records.filter((rec) => rec.status === "STORED").length,
+
+    // NEW: Sums up the unchangeable initial_bags column!
+    // (Added a fallback to rec.bags just in case a record is missing it)
+    totalBags: records.reduce(
+      (sum, rec) => sum + (Number(rec.initial_bags) || Number(rec.bags) || 0),
+      0,
+    ),
+
+    activeBags: records
+      .filter((rec) => rec.status === "STORED")
+      .reduce((sum, rec) => sum + (Number(rec.bags) || 0), 0),
+
     checkedOut: records.filter(
       (rec) => rec.status === "COLLECTED" || rec.status === "RETURNED",
     ).length,
@@ -207,26 +220,40 @@ export default function RecordsView() {
       )}
 
       {/* 1. Summary Stats Bar */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      {/* 1. Summary Stats Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* Total Mahatmas */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border-b-4 border-blue-500 text-center">
-          <p className="text-gray-500 text-xs font-black uppercase tracking-widest">
+          <p className="text-gray-500 text-[10px] md:text-xs font-black uppercase tracking-widest">
             Total Mahatmas
           </p>
           <p className="text-3xl font-black text-gray-900">
             {stats.totalVisitors}
           </p>
         </div>
+
+        {/* NEW: Total Bags Ever Checked In */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border-b-4 border-purple-500 text-center">
+          <p className="text-gray-500 text-[10px] md:text-xs font-black uppercase tracking-widest">
+            Total Bags
+          </p>
+          <p className="text-3xl font-black text-gray-900">{stats.totalBags}</p>
+        </div>
+
+        {/* Physical Bags Currently Inside */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border-b-4 border-orange-500 text-center">
-          <p className="text-gray-500 text-xs font-black uppercase tracking-widest">
+          <p className="text-gray-500 text-[10px] md:text-xs font-black uppercase tracking-widest">
             Bags Inside
           </p>
           <p className="text-3xl font-black text-gray-900">
             {stats.activeBags}
           </p>
         </div>
+
+        {/* Mahatmas Checked Out */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border-b-4 border-green-500 text-center">
-          <p className="text-gray-500 text-xs font-black uppercase tracking-widest">
-            Returned
+          <p className="text-gray-500 text-[10px] md:text-xs font-black uppercase tracking-widest">
+            Returned (PPL)
           </p>
           <p className="text-3xl font-black text-gray-900">
             {stats.checkedOut}
@@ -360,6 +387,18 @@ export default function RecordsView() {
                       >
                         <PrinterIcon className="h-4 w-4" /> REPRINT
                       </Link>
+
+                      <button
+                        onClick={() => {
+                          const token = record.display_token || record.id;
+                          const msg = `Jai Sachchidanand ${record.name}!\nYour ${record.bags} bag(s) are safely stored.\nToken: ${token}`;
+                          // Opens the phone's native SMS app with number and message pre-filled
+                          window.location.href = `sms:${record.mobile}?body=${encodeURIComponent(msg)}`;
+                        }}
+                        className="w-28 bg-blue-600 text-white border border-blue-700 px-3 py-2 rounded-lg text-[11px] font-black tracking-wide hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                        <ChatBubbleLeftRightIcon className="h-4 w-4" /> SEND SMS
+                      </button>
                     </div>
                   </td>
                 </tr>
