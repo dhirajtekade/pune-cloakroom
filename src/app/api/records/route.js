@@ -23,6 +23,7 @@ export async function GET(request) {
           mobile,
           city,
           bag_count as bags, 
+          initial_bag_count as initial_bags,
           status, 
           to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'HH:MI AM') as time 
         FROM checkins 
@@ -80,7 +81,7 @@ export async function PUT(request) {
     else if (action === "END_OF_DAY") {
       await sql`
         UPDATE checkins 
-        SET status = 'RETURNED', bag_count = 0, updated_at = NOW() 
+        SET status = 'RETURNED', updated_at = NOW() 
         WHERE status = 'STORED'
       `;
     }
