@@ -12,6 +12,7 @@ import html2canvas from "html2canvas";
 
 export default function PreviewClient({ tokenData }) {
   const [isPrinting, setIsPrinting] = useState(false);
+  const [hybridStep, setHybridStep] = useState(1);
 
   if (!tokenData) {
     return (
@@ -132,10 +133,11 @@ export default function PreviewClient({ tokenData }) {
   };
 
   // --- 4. NEW: HYBRID SVG PRINT ---
+  // --- 4. NEW: 2-STEP HYBRID SVG PRINT ---
   const handleSvgPrint = async () => {
-    setIsPrinting(true);
-    try {
+    if (hybridStep === 1) {
       // STEP 1: NATIVE MASTER TOKEN
+      const INIT = "\x1B\x40";
       const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
       const MAX_SIZE = "\x1D\x21\x33";
       const BOLD_ON = "\x1BE\x01";
@@ -146,41 +148,47 @@ export default function PreviewClient({ tokenData }) {
       const BARCODE_WIDTH = "\x1D\x77\x04";
       const BARCODE_TEXT_OFF = "\x1D\x48\x00";
 
-      const scanCodeCommand = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${bigToken}\x00 \n \n\n`;
+      const scanCodeCommand = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${bigToken}\x00 \n`;
 
       const masterTokenStr =
-        `${CENTER}${NORMAL_SIZE}` +
-        `\n DATE: ${displayDate}\n\n` +
-        `${scanCodeCommand}` +
+        `${INIT}${CENTER}${NORMAL_SIZE}` +
+        `DATE: ${displayDate}\n\n` +
+        `${scanCodeCommand}\n\n` +
         `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-        `${BOLD_ON}${tokenData.bag_count} Bags - ${tokenData.name.toUpperCase()}${BOLD_OFF}\n\n\n\n\n` +
+        `${BOLD_ON}${tokenData.bag_count} Bags - ${tokenData.name.toUpperCase()}${BOLD_OFF}\n\n\n\n` +
         `${FF}`;
 
       const encodedData = btoa(unescape(encodeURIComponent(masterTokenStr)));
       const nativeLink = document.createElement("a");
       nativeLink.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+
+      // Update UI state for the next tap BEFORE leaving the browser
+      setHybridStep(2);
       nativeLink.click();
+    } else if (hybridStep === 2) {
+      // STEP 2: SCREENSHOT AND PRINT ALL BAG SVG TOKENS
+      setIsPrinting(true);
+      try {
+        const element = document.getElementById("svg-bag-receipts");
+        if (element) {
+          const canvas = await html2canvas(element, {
+            scale: 2,
+            backgroundColor: "#ffffff",
+            useCORS: true,
+          });
+          const imageDataUrl = canvas.toDataURL("image/png");
+          const imgLink = document.createElement("a");
+          imgLink.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
 
-      // STEP 2: PAUSE 3 SECONDS FOR MASTER TO PRINT
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // STEP 3: SCREENSHOT AND PRINT ALL BAG SVG TOKENS
-      const element = document.getElementById("svg-bag-receipts");
-      if (element) {
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          backgroundColor: "#ffffff",
-          useCORS: true,
-        });
-        const imageDataUrl = canvas.toDataURL("image/png");
-        const imgLink = document.createElement("a");
-        imgLink.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-        imgLink.click();
+          // Reset the button back to Step 1 for the next user
+          setHybridStep(1);
+          imgLink.click();
+        }
+      } catch (err) {
+        alert("Hybrid SVG print failed: " + err.message);
+      } finally {
+        setIsPrinting(false);
       }
-    } catch (err) {
-      alert("Hybrid SVG print failed: " + err.message);
-    } finally {
-      setIsPrinting(false);
     }
   };
 
@@ -206,12 +214,21 @@ export default function PreviewClient({ tokenData }) {
         <button
           onClick={handleSvgPrint}
           disabled={isPrinting}
-          className={`w-full text-white p-5 rounded-xl font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(59,130,246,0.4)] active:scale-95 transition-transform ${isPrinting ? "bg-blue-800 cursor-wait" : "bg-blue-600 hover:bg-blue-500 border-2 border-blue-400"}`}
+          className={`w-full text-white p-5 rounded-xl font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(59,130,246,0.4)] active:scale-95 transition-transform ${
+            isPrinting
+              ? "bg-blue-800 cursor-wait"
+              : hybridStep === 1
+                ? "bg-blue-600 hover:bg-blue-500 border-2 border-blue-400"
+                : "bg-orange-600 hover:bg-orange-500 border-2 border-orange-400 animate-pulse"
+          }`}
         >
           <SparklesIcon className="h-7 w-7 text-yellow-300" />
-          {isPrinting ? "PRINTING SEQUENCE..." : "SVG PRINT (BEST)"}
+          {isPrinting
+            ? "PROCESSING..."
+            : hybridStep === 1
+              ? "1. PRINT MASTER TOKEN"
+              : "2. PRINT BAG LABELS"}
         </button>
-
         {/* Top Row: Back & Native Print */}
         <div className="flex justify-between gap-3 w-full mt-2">
           <Link
