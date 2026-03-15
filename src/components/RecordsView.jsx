@@ -55,19 +55,28 @@ export default function RecordsView() {
 
   // Summary Logic
   // Summary Logic
+  // Summary Logic
   const stats = {
     totalVisitors: records.length,
 
-    // NEW: Sums up the unchangeable initial_bags column!
-    // (Added a fallback to rec.bags just in case a record is missing it)
+    // FIX: Added initial_bag_count and bag_count to perfectly match the database columns!
     totalBags: records.reduce(
-      (sum, rec) => sum + (Number(rec.initial_bags) || Number(rec.bags) || 0),
+      (sum, rec) =>
+        sum +
+        (Number(rec.initial_bag_count) ||
+          Number(rec.initial_bags) ||
+          Number(rec.bag_count) ||
+          Number(rec.bags) ||
+          0),
       0,
     ),
 
     activeBags: records
       .filter((rec) => rec.status === "STORED")
-      .reduce((sum, rec) => sum + (Number(rec.bags) || 0), 0),
+      .reduce(
+        (sum, rec) => sum + (Number(rec.bag_count) || Number(rec.bags) || 0),
+        0,
+      ),
 
     checkedOut: records.filter(
       (rec) => rec.status === "COLLECTED" || rec.status === "RETURNED",
