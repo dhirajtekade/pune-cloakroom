@@ -10,6 +10,7 @@ import {
   ChatBubbleLeftRightIcon,
   ArrowPathIcon,
   DocumentMagnifyingGlassIcon,
+  SparklesIcon, // Added SparklesIcon for the new Hybrid button
 } from "@heroicons/react/24/solid";
 
 export default function CheckInView() {
@@ -23,10 +24,85 @@ export default function CheckInView() {
   const [successData, setSuccessData] = useState(null);
   const [isResending, setIsResending] = useState(false);
 
+  // --- NEW STATES FOR HYBRID 2-STEP PRINT ---
   const [submitAction, setSubmitAction] = useState("PRINT");
+  const [hybridStep, setHybridStep] = useState(1);
+  const [hybridData, setHybridData] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const triggerNativeMasterPrint = (tokenId, mahatmaName, bags) => {
+    let shortToken = tokenId;
+    if (String(shortToken).includes("-"))
+      shortToken = String(shortToken).split("-")[1];
+    const pureNum = Number(String(shortToken).replace(/\D/g, "")) || 0;
+    const bigToken = String(pureNum);
+
+    const displayDate = new Date()
+      .toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+      .toUpperCase();
+
+    const INIT = "\x1B\x40";
+    const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
+    const MAX_SIZE = "\x1D\x21\x33";
+    const BOLD_ON = "\x1BE\x01";
+    const BOLD_OFF = "\x1BE\x00";
+    const CENTER = "\x1Ba\x01";
+    const FF = "\x0C";
+    const BARCODE_HEIGHT = "\x1D\x68\x40";
+    const BARCODE_WIDTH = "\x1D\x77\x04";
+    const BARCODE_TEXT_OFF = "\x1D\x48\x00";
+
+    const scanCodeCommand = `${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${bigToken}\x00`;
+
+    const masterTokenStr =
+      `${INIT}${CENTER}${NORMAL_SIZE}` +
+      `DATE: ${displayDate}\n\n` +
+      `${scanCodeCommand}\n\n` +
+      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
+      `${BOLD_ON}${bags} Bags - ${mahatmaName.toUpperCase()}${BOLD_OFF}\n` +
+      `${FF}`;
+
+    const encodedData = btoa(unescape(encodeURIComponent(masterTokenStr)));
+    const nativeLink = document.createElement("a");
+    nativeLink.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+    nativeLink.click();
+  };
+
+  const handleHybridStep2 = async () => {
+    setIsPrinting(true);
+    try {
+      const element = document.getElementById("hidden-svg-bag-receipts");
+      if (element) {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+        });
+        const imageDataUrl = canvas.toDataURL("image/png");
+        const imgLink = document.createElement("a");
+        imgLink.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+        imgLink.click();
+      }
+
+      // Print finished! Now show the final Success Screen
+      setSuccessData(hybridData);
+      setHybridStep(1);
+      setHybridData(null);
+    } catch (err) {
+      alert("Hybrid SVG print failed: " + err.message);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
+    if (hybridStep === 2) return; // Prevent accidental form submit during step 2
+
     setIsLoading(true);
     try {
       const response = await fetch("/api/checkin", {
@@ -37,21 +113,28 @@ export default function CheckInView() {
       const data = await response.json();
 
       if (data.success) {
-        // --- NEW LOGIC: IF THEY CLICKED SAVE, REDIRECT IMMEDIATELY ---
         if (submitAction === "SAVE") {
           router.push(`/preview/${data.tokenId}`);
-          return; // Stop execution here so it doesn't show the success screen
+          return;
         }
 
-        // Prepare data for the hidden component tick
+        // --- HYBRID 2-STEP LOGIC ---
+        if (submitAction === "HYBRID") {
+          // Fire Master Print immediately
+          triggerNativeMasterPrint(data.tokenId, name, bagCount);
+          // Lock the data for Step 2 and keep form visible
+          setHybridData({ tokenId: data.tokenId, name, mobile, bagCount });
+          setHybridStep(2);
+          setIsLoading(false);
+          return; // Stop here so it doesn't show the success screen yet!
+        }
+
+        // --- NORMAL FLOW (Old Native/Image Mode) ---
         setSuccessData({ tokenId: data.tokenId, name, mobile, bagCount });
 
-        // DYNAMIC PRINTING MODE SELECTOR
         if (data.printAsImage) {
-          // --- IMAGE MODE ---
           printAsImageTokens(data.tokenId, data.enablePageCut);
         } else {
-          // --- NATIVE MODE (Old ESC/POS) ---
           try {
             printTokens(
               data.tokenId,
@@ -77,23 +160,21 @@ export default function CheckInView() {
       setIsLoading(false);
     }
   };
+
   const resendSMS = async () => {
     if (!successData) return;
     setIsResending(true);
-
     try {
       const res = await fetch("/api/checkin/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mobile: successData.mobile,
-          // FIX: successData.tokenId is already fully formatted as "9-0094"
           tokenId: successData.tokenId,
           name: successData.name,
           bagCount: successData.bagCount,
         }),
       });
-
       const data = await res.json();
       if (data.success) {
         alert("SMS Sent Successfully!");
@@ -109,36 +190,19 @@ export default function CheckInView() {
 
   const shareToSMS = () => {
     if (!successData) return;
-
-    const dateCode = new Date().getDate();
     const displayToken = `${String(successData.tokenId).padStart(4, "0")}`;
     const { name, mobile, bagCount } = successData;
-
-    // Build the short, clean SMS message
     const messageText = `JSCA ${name.toUpperCase()},\nToken: ${displayToken} for ${bagCount} bag(s).\nClose time: 09:00PM`;
-
-    // Encode it for the URL
     const encodedText = encodeURIComponent(messageText);
-
-    // Use the native 'sms:' protocol.
-    // We use _self instead of _blank so the phone knows to open the native app.
     const url = `sms:+91${mobile}?body=${encodedText}`;
     window.open(url, "_self");
   };
 
-  //whatasapp share
   const shareToWhatsApp = () => {
     if (!successData) return;
-
     const dateCode = new Date().getDate();
     const displayToken = `${String(successData.tokenId).padStart(4, "0")}`;
-
-    // 1. Format the token correctly
-    const { tokenId, name, mobile, bagCount } = successData;
-    // Create the display token (e.g., 12-0045)
-    // const tokenStr = `#${String(tokenId).padStart(4, "0")}`;
-
-    // 2. Build the message string
+    const { name, mobile, bagCount } = successData;
     const messageText =
       `*SAMAN GHAR PUNE*\n` +
       `Jai Satchitanand!\n\n` +
@@ -147,27 +211,22 @@ export default function CheckInView() {
       `Name: *${name.toUpperCase()}*\n` +
       `Bags: *${bagCount}*\n\n` +
       `Please show this message to collect your bags.`;
-
-    // 3. ENCODE the entire message for the URL
     const encodedText = encodeURIComponent(messageText);
-
-    // 4. Open WhatsApp
     window.open(`https://wa.me/91${mobile}?text=${encodedText}`, "_blank");
   };
 
-  //reset form
   const resetForm = () => {
     setSuccessData(null);
     setName("");
     setMobile("");
     setCity("");
     setBagCount(1);
+    setHybridStep(1);
+    setHybridData(null);
   };
 
   if (successData) {
-    const dateCode = new Date().getDate();
     const displayToken = `${String(successData.tokenId).padStart(4, "0")}`;
-
     return (
       <div className="bg-gray-900 rounded-2xl shadow-2xl p-8 max-w-md mx-auto border-2 border-green-500/50 text-center">
         <div className="flex justify-center mb-4">
@@ -188,8 +247,6 @@ export default function CheckInView() {
             <ChatBubbleLeftRightIcon className="h-7 w-7" />
             SHARE ON WHATSAPP
           </button>
-
-          {/* NEW NATIVE SMS BUTTON */}
           <button
             onClick={shareToSMS}
             className="w-full p-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
@@ -197,8 +254,6 @@ export default function CheckInView() {
             <ChatBubbleLeftRightIcon className="h-7 w-7" />
             SEND NATIVE SMS (Personal)
           </button>
-
-          {/* NEW RESEND SMS BUTTON */}
           <button
             onClick={resendSMS}
             disabled={isResending}
@@ -211,7 +266,6 @@ export default function CheckInView() {
             <ChatBubbleLeftRightIcon className="h-5 w-5" />
             {isResending ? "SENDING..." : "RESEND SYSTEM SMS"}
           </button>
-
           <button
             onClick={resetForm}
             className="w-full p-5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-2xl font-bold flex items-center justify-center gap-3"
@@ -224,29 +278,33 @@ export default function CheckInView() {
     );
   }
 
-  // --- ADD THIS RIGHT ABOVE YOUR RETURN STATEMENT ---
-  let displayBigToken = "93"; // Placeholder for the hidden template before a scan
-  let scanPayload = "93";
-
-  if (successData && successData.tokenId) {
-    const baseNumberStr = String(successData.tokenId);
-    let extractedStr = baseNumberStr;
-
-    // Safely extract just "94" from "9-0094"
-    if (baseNumberStr.includes("-")) {
-      extractedStr = baseNumberStr.split("-")[1];
-    }
-    const pureNum = Number(extractedStr.replace(/\D/g, "")) || 0;
-
-    displayBigToken = String(pureNum); // This becomes "94"
-    scanPayload = displayBigToken; // Keeping it lightweight for barcodes
-  }
-
   return (
-    <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800 mt-1 mb-40">
+    <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800 mt-1 mb-40 relative">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 5.1
+        Pune Cloakroom 6.4
       </h2>
+
+      {/* Lock out the form inputs visually if we are waiting for Step 2 */}
+      {hybridStep === 2 && (
+        <div className="absolute inset-0 bg-gray-900/80 z-10 rounded-2xl flex flex-col items-center justify-start pt-[30%]">
+          <p className="text-white font-bold mb-4 px-8 text-center">
+            Master Token saved and printed!
+            <br />
+            Tap below to finish the process.
+          </p>
+          <div className="w-full px-6">
+            <button
+              type="button"
+              onClick={handleHybridStep2}
+              disabled={isPrinting}
+              className="w-full p-6 rounded-xl font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(249,115,22,0.6)] active:scale-95 transition-transform bg-orange-600 hover:bg-orange-500 border-2 border-orange-400 animate-pulse text-white"
+            >
+              <SparklesIcon className="h-8 w-8 text-yellow-300" />
+              {isPrinting ? "PROCESSING LABELS..." : "2. PRINT BAG LABELS"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleCheckIn} className="space-y-4">
         <div className="flex items-center justify-between border-2 border-gray-700 bg-gray-800 rounded-xl p-2">
@@ -259,8 +317,6 @@ export default function CheckInView() {
           >
             <MinusIcon className="h-7 w-7" />
           </button>
-
-          {/* FIX: Removed readOnly, added onChange, onFocus, and onBlur */}
           <input
             type="number"
             value={bagCount}
@@ -268,11 +324,10 @@ export default function CheckInView() {
               const val = e.target.value;
               setBagCount(val === "" ? "" : parseInt(val, 10));
             }}
-            onFocus={(e) => e.target.select()} // Highlights the number instantly when tapped!
-            onBlur={() => setBagCount(Math.max(1, Number(bagCount) || 1))} // Safety net if left blank
+            onFocus={(e) => e.target.select()}
+            onBlur={() => setBagCount(Math.max(1, Number(bagCount) || 1))}
             className="w-full text-center text-4xl font-black bg-transparent text-white focus:outline-none"
           />
-
           <button
             type="button"
             onClick={() => setBagCount((Number(bagCount) || 0) + 1)}
@@ -311,21 +366,38 @@ export default function CheckInView() {
           />
         </div>
 
+        {/* --- NEW BUTTON: 2-STEP HYBRID PRINT --- */}
         <button
           type="submit"
-          disabled={isLoading}
-          className={`w-full mt-4 p-5 rounded-xl text-xl font-bold text-white flex items-center justify-center space-x-2 ${isLoading ? "bg-gray-400" : "bg-green-600"}`}
+          onClick={() => setSubmitAction("HYBRID")}
+          disabled={isLoading || hybridStep === 2}
+          className="w-full mt-4 p-5 rounded-xl text-xl font-black text-white flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(59,130,246,0.4)] active:scale-95 transition-transform bg-blue-600 hover:bg-blue-500 border-2 border-blue-400"
         >
-          <PrinterIcon className="h-7 w-7" />
-          <span>{isLoading ? "Saving..." : `Print ${bagCount} Labels`}</span>
+          <SparklesIcon className="h-7 w-7 text-yellow-300" />
+          {isLoading && submitAction === "HYBRID"
+            ? "SAVING..."
+            : "1. PRINT MAHATMA TOKEN"}
         </button>
 
-        {/* NEW: SAVE & PREVIEW BUTTON */}
         <button
           type="submit"
-          onClick={() => setSubmitAction("SAVE")} // Sets action to SAVE
-          disabled={isLoading}
-          className={`w-full p-4 rounded-xl text-lg font-bold text-white flex items-center justify-center space-x-2 active:scale-95 transition-transform ${isLoading ? "bg-gray-600" : "bg-gray-700 hover:bg-gray-600 border border-gray-600"}`}
+          onClick={() => setSubmitAction("PRINT")}
+          disabled={isLoading || hybridStep === 2}
+          className={`w-full p-4 rounded-xl text-lg font-bold text-white flex items-center justify-center space-x-2 ${isLoading && submitAction === "PRINT" ? "bg-gray-400" : "bg-green-600"}`}
+        >
+          <PrinterIcon className="h-6 w-6" />
+          <span>
+            {isLoading && submitAction === "PRINT"
+              ? "Saving..."
+              : `Print ${bagCount} Labels (Old)`}
+          </span>
+        </button>
+
+        <button
+          type="submit"
+          onClick={() => setSubmitAction("SAVE")}
+          disabled={isLoading || hybridStep === 2}
+          className={`w-full p-4 rounded-xl text-lg font-bold text-white flex items-center justify-center space-x-2 active:scale-95 transition-transform ${isLoading && submitAction === "SAVE" ? "bg-gray-600" : "bg-gray-700 hover:bg-gray-600 border border-gray-600"}`}
         >
           <DocumentMagnifyingGlassIcon className="h-6 w-6 text-blue-400" />
           <span>
@@ -337,8 +409,69 @@ export default function CheckInView() {
       </form>
 
       {/* ======================================================= */}
-      {/* HIDDEN THERMAL LABEL TEMPLATE (ONLY USED FOR IMAGE MODE) */}
+      {/* HIDDEN SVG BAG TEMPLATES (FOR HYBRID STEP 2) */}
       {/* ======================================================= */}
+      {hybridData && (
+        <div
+          style={{
+            position: "absolute",
+            left: "-9999px",
+            top: "0",
+            zIndex: -1000,
+          }}
+        >
+          <div id="hidden-svg-bag-receipts" className="flex flex-col bg-white">
+            {Array.from({ length: hybridData.bagCount }).map((_, index) => {
+              let pureNum = 0;
+              if (hybridData.tokenId) {
+                let str = String(hybridData.tokenId);
+                if (str.includes("-")) str = str.split("-")[1];
+                pureNum = Number(str.replace(/\D/g, "")) || 0;
+              }
+              return (
+                <div
+                  key={`bag-${index}`}
+                  className="bg-[#ffffff] flex flex-col font-sans w-[800px] h-[850px] box-border relative overflow-hidden text-[#000000]"
+                >
+                  <div className="w-full h-[550px] flex flex-col items-center justify-center p-8 border-b-4 border-dashed border-[#cccccc]">
+                    <div className="text-center text-5xl font-black uppercase">
+                      {index + 1} / {hybridData.bagCount}
+                    </div>
+                    <div className="flex-grow flex items-center justify-center w-full overflow-hidden my-4">
+                      <svg viewBox="0 0 100 60" className="w-full h-full">
+                        <text
+                          x="60"
+                          y="40"
+                          textAnchor="middle"
+                          fontSize="70"
+                          fontWeight="500"
+                          fill="#000000"
+                          dominantBaseline="middle"
+                        >
+                          {pureNum}
+                        </text>
+                      </svg>
+                    </div>
+                    <div className="text-center text-3xl font-black uppercase tracking-widest mb-4">
+                      {hybridData.mobile} ({hybridData.bagCount}B)
+                    </div>
+                  </div>
+                  <div className="w-full h-[300px] bg-[#ffffff] flex items-end justify-center pb-2">
+                    <span style={{ color: "#cccccc" }} className="text-xs">
+                      .
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================= */}
+      {/* HIDDEN THERMAL LABEL TEMPLATE (ONLY USED FOR OLD IMAGE MODE) */}
+      {/* ======================================================= */}
+      {/* ... keeping your existing hidden template so old code doesn't break ... */}
       <div
         style={{
           position: "absolute",
@@ -353,13 +486,12 @@ export default function CheckInView() {
           id="thermal-label-template"
           className="bg-white text-black flex flex-col items-center justify-between font-sans"
           style={{
-            width: "576px", // Exact dot-width of an 80mm thermal printer
-            height: "360px", // Exact proportional height for 50mm
+            width: "576px",
+            height: "360px",
             padding: "20px",
             boxSizing: "border-box",
           }}
         >
-          {/* Header */}
           <div
             id="img-date"
             style={{
@@ -370,8 +502,6 @@ export default function CheckInView() {
           >
             JSCA SAMAN GHAR
           </div>
-
-          {/* Middle: The Barcode Placeholder */}
           <div
             style={{
               fontSize: "32px",
@@ -384,12 +514,10 @@ export default function CheckInView() {
           >
             <span id="img-scan-payload">Scan Payload: 93</span>
           </div>
-
-          {/* Bottom: Giant Token */}
           <div
             id="img-big-token"
             style={{
-              fontSize: "150px", // Massive, but safely inside the 360px box!
+              fontSize: "150px",
               fontWeight: "900",
               lineHeight: "1",
               marginTop: "10px",
