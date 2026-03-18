@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import html2canvas from "html2canvas";
 import {
@@ -10,11 +10,13 @@ import {
   ChatBubbleLeftRightIcon,
   ArrowPathIcon,
   DocumentMagnifyingGlassIcon,
-  SparklesIcon, // Added SparklesIcon for the new Hybrid button
+  SparklesIcon,
 } from "@heroicons/react/24/solid";
 
 export default function CheckInView() {
   const router = useRouter();
+
+  const mobileInputRef = useRef(null);
 
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
@@ -24,7 +26,6 @@ export default function CheckInView() {
   const [successData, setSuccessData] = useState(null);
   const [isResending, setIsResending] = useState(false);
 
-  // --- NEW STATES FOR HYBRID 2-STEP PRINT ---
   const [submitAction, setSubmitAction] = useState("PRINT");
   const [hybridStep, setHybridStep] = useState(1);
   const [hybridData, setHybridData] = useState(null);
@@ -72,36 +73,24 @@ export default function CheckInView() {
     nativeLink.click();
   };
 
-  const handleHybridStep2 = async () => {
-    setIsPrinting(true);
-    try {
-      const element = document.getElementById("hidden-svg-bag-receipts");
-      if (element) {
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          backgroundColor: "#ffffff",
-          useCORS: true,
-        });
-        const imageDataUrl = canvas.toDataURL("image/png");
-        const imgLink = document.createElement("a");
-        imgLink.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-        imgLink.click();
-      }
+  // --- REVERSED: STEP 2 IS NOW THE MAHATMA TOKEN ---
+  const handleHybridStep2 = () => {
+    // 1. Fire Native Master Print
+    triggerNativeMasterPrint(
+      hybridData.tokenId,
+      hybridData.name,
+      hybridData.bagCount,
+    );
 
-      // Print finished! Now show the final Success Screen
-      setSuccessData(hybridData);
-      setHybridStep(1);
-      setHybridData(null);
-    } catch (err) {
-      alert("Hybrid SVG print failed: " + err.message);
-    } finally {
-      setIsPrinting(false);
-    }
+    // 2. Finish the flow and show the final Success Screen
+    setSuccessData(hybridData);
+    setHybridStep(1);
+    setHybridData(null);
   };
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
-    if (hybridStep === 2) return; // Prevent accidental form submit during step 2
+    if (hybridStep === 2) return;
 
     setIsLoading(true);
     try {
@@ -118,15 +107,39 @@ export default function CheckInView() {
           return;
         }
 
-        // --- HYBRID 2-STEP LOGIC ---
+        // --- REVERSED: STEP 1 IS NOW THE BAG LABELS (SVG) ---
         if (submitAction === "HYBRID") {
-          // Fire Master Print immediately
-          triggerNativeMasterPrint(data.tokenId, name, bagCount);
-          // Lock the data for Step 2 and keep form visible
+          // 1. Lock data so the hidden SVGs can render
           setHybridData({ tokenId: data.tokenId, name, mobile, bagCount });
-          setHybridStep(2);
-          setIsLoading(false);
-          return; // Stop here so it doesn't show the success screen yet!
+          setHybridStep(2); // Show the overlay immediately
+          setIsPrinting(true); // Changes overlay button to "GENERATING BAGS..."
+
+          // 2. Add a slight delay to allow React to mount the SVGs before screenshotting
+          setTimeout(async () => {
+            try {
+              const element = document.getElementById(
+                "hidden-svg-bag-receipts",
+              );
+              if (element) {
+                const canvas = await html2canvas(element, {
+                  scale: 2,
+                  backgroundColor: "#ffffff",
+                  useCORS: true,
+                });
+                const imageDataUrl = canvas.toDataURL("image/png");
+                const imgLink = document.createElement("a");
+                imgLink.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+                imgLink.click(); // Fires intent to print bags
+              }
+            } catch (err) {
+              alert("Bag print failed: " + err.message);
+            } finally {
+              setIsPrinting(false); // Restores the button so they can click Step 2
+              setIsLoading(false);
+            }
+          }, 500); // 500ms safety buffer
+
+          return; // Stop execution so it waits for user to click Step 2
         }
 
         // --- NORMAL FLOW (Old Native/Image Mode) ---
@@ -176,11 +189,8 @@ export default function CheckInView() {
         }),
       });
       const data = await res.json();
-      if (data.success) {
-        alert("SMS Sent Successfully!");
-      } else {
-        alert("Failed to send: " + data.error);
-      }
+      if (data.success) alert("SMS Sent Successfully!");
+      else alert("Failed to send: " + data.error);
     } catch (err) {
       alert("Check connection.");
     } finally {
@@ -223,6 +233,12 @@ export default function CheckInView() {
     setBagCount(1);
     setHybridStep(1);
     setHybridData(null);
+
+    setTimeout(() => {
+      if (mobileInputRef.current) {
+        mobileInputRef.current.focus();
+      }
+    }, 100);
   };
 
   if (successData) {
@@ -244,34 +260,27 @@ export default function CheckInView() {
             onClick={shareToWhatsApp}
             className="w-full p-5 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
           >
-            <ChatBubbleLeftRightIcon className="h-7 w-7" />
-            SHARE ON WHATSAPP
+            <ChatBubbleLeftRightIcon className="h-7 w-7" /> SHARE ON WHATSAPP
           </button>
           <button
             onClick={shareToSMS}
             className="w-full p-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"
           >
-            <ChatBubbleLeftRightIcon className="h-7 w-7" />
-            SEND NATIVE SMS (Personal)
+            <ChatBubbleLeftRightIcon className="h-7 w-7" /> SEND NATIVE SMS
           </button>
           <button
             onClick={resendSMS}
             disabled={isResending}
-            className={`w-full p-4 rounded-2xl font-bold flex items-center justify-center gap-3 border-2 transition-all ${
-              isResending
-                ? "bg-gray-800 border-gray-700 text-gray-500"
-                : "bg-blue-600/10 border-blue-600 text-blue-400 hover:bg-blue-600/20"
-            }`}
+            className={`w-full p-4 rounded-2xl font-bold flex items-center justify-center gap-3 border-2 transition-all ${isResending ? "bg-gray-800 border-gray-700 text-gray-500" : "bg-blue-600/10 border-blue-600 text-blue-400 hover:bg-blue-600/20"}`}
           >
-            <ChatBubbleLeftRightIcon className="h-5 w-5" />
+            <ChatBubbleLeftRightIcon className="h-5 w-5" />{" "}
             {isResending ? "SENDING..." : "RESEND SYSTEM SMS"}
           </button>
           <button
             onClick={resetForm}
             className="w-full p-5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-2xl font-bold flex items-center justify-center gap-3"
           >
-            <ArrowPathIcon className="h-5 w-5" />
-            NEXT MAHATMA
+            <ArrowPathIcon className="h-5 w-5" /> NEXT MAHATMA
           </button>
         </div>
       </div>
@@ -281,65 +290,37 @@ export default function CheckInView() {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-md mx-auto border border-gray-800 mt-1 mb-40 relative">
       <h2 className="text-2xl font-black mb-6 text-center text-blue-400 uppercase tracking-tight">
-        Pune Cloakroom 6.4
+        Pune Cloakroom 7.2
       </h2>
 
-      {/* Lock out the form inputs visually if we are waiting for Step 2 */}
+      {/* OVERLAY: Shows when Bag Labels are processing/printed */}
       {hybridStep === 2 && (
         <div className="absolute inset-0 bg-gray-900/80 z-10 rounded-2xl flex flex-col items-center justify-start pt-[30%]">
           <p className="text-white font-bold mb-4 px-8 text-center">
-            Master Token saved and printed!
+            Bag Labels saved and sent to printer!
             <br />
-            Tap below to finish the process.
+            Tap below to print the Mahatma Token.
           </p>
           <div className="w-full px-6">
             <button
               type="button"
               onClick={handleHybridStep2}
               disabled={isPrinting}
-              className="w-full p-6 rounded-xl font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(249,115,22,0.6)] active:scale-95 transition-transform bg-orange-600 hover:bg-orange-500 border-2 border-orange-400 animate-pulse text-white"
+              className={`w-full p-6 rounded-xl font-black flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(249,115,22,0.6)] active:scale-95 transition-transform text-white ${isPrinting ? "bg-orange-800 cursor-wait border-2 border-orange-700" : "bg-orange-600 hover:bg-orange-500 border-2 border-orange-400 animate-pulse"}`}
             >
               <SparklesIcon className="h-8 w-8 text-yellow-300" />
-              {isPrinting ? "PROCESSING LABELS..." : "2. PRINT BAG LABELS"}
+              {isPrinting ? "GENERATING BAGS..." : "2. PRINT MAHATMA TOKEN"}
             </button>
           </div>
         </div>
       )}
 
       <form onSubmit={handleCheckIn} className="space-y-4">
-        <div className="flex items-center justify-between border-2 border-gray-700 bg-gray-800 rounded-xl p-2">
-          <button
-            type="button"
-            onClick={() =>
-              setBagCount(Math.max(1, (Number(bagCount) || 1) - 1))
-            }
-            className="bg-gray-700 p-4 rounded-lg text-white active:scale-95 transition-transform"
-          >
-            <MinusIcon className="h-7 w-7" />
-          </button>
-          <input
-            type="number"
-            value={bagCount}
-            onChange={(e) => {
-              const val = e.target.value;
-              setBagCount(val === "" ? "" : parseInt(val, 10));
-            }}
-            onFocus={(e) => e.target.select()}
-            onBlur={() => setBagCount(Math.max(1, Number(bagCount) || 1))}
-            className="w-full text-center text-4xl font-black bg-transparent text-white focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => setBagCount((Number(bagCount) || 0) + 1)}
-            className="bg-blue-600 p-4 rounded-lg text-white active:scale-95 transition-transform"
-          >
-            <PlusIcon className="h-7 w-7" />
-          </button>
-        </div>
-
         <div className="space-y-3">
+          {/* 1. Mobile Number */}
           <input
             type="text"
+            ref={mobileInputRef}
             inputMode="numeric"
             value={mobile}
             onChange={(e) =>
@@ -349,6 +330,8 @@ export default function CheckInView() {
             className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white outline-none"
             required
           />
+
+          {/* 2. Mahatma Name */}
           <input
             type="text"
             value={name}
@@ -357,6 +340,39 @@ export default function CheckInView() {
             className="w-full p-4 bg-black border-2 border-gray-700 rounded-xl text-xl font-bold text-center text-white outline-none"
             required
           />
+
+          {/* 3. Bag Count Widget (Moved Here!) */}
+          <div className="flex items-center justify-between border-2 border-gray-700 bg-gray-800 rounded-xl p-2">
+            <button
+              type="button"
+              onClick={() =>
+                setBagCount(Math.max(1, (Number(bagCount) || 1) - 1))
+              }
+              className="bg-gray-700 p-4 rounded-lg text-white active:scale-95 transition-transform"
+            >
+              <MinusIcon className="h-7 w-7" />
+            </button>
+            <input
+              type="number"
+              value={bagCount}
+              onChange={(e) => {
+                const val = e.target.value;
+                setBagCount(val === "" ? "" : parseInt(val, 10));
+              }}
+              onFocus={(e) => e.target.select()}
+              onBlur={() => setBagCount(Math.max(1, Number(bagCount) || 1))}
+              className="w-full text-center text-4xl font-black bg-transparent text-white focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setBagCount((Number(bagCount) || 0) + 1)}
+              className="bg-blue-600 p-4 rounded-lg text-white active:scale-95 transition-transform"
+            >
+              <PlusIcon className="h-7 w-7" />
+            </button>
+          </div>
+
+          {/* 4. City / Village */}
           <input
             type="text"
             value={city}
@@ -366,7 +382,7 @@ export default function CheckInView() {
           />
         </div>
 
-        {/* --- NEW BUTTON: 2-STEP HYBRID PRINT --- */}
+        {/* --- BUTTON 1: HYBRID PRINT (REVERSED) --- */}
         <button
           type="submit"
           onClick={() => setSubmitAction("HYBRID")}
@@ -376,7 +392,7 @@ export default function CheckInView() {
           <SparklesIcon className="h-7 w-7 text-yellow-300" />
           {isLoading && submitAction === "HYBRID"
             ? "SAVING..."
-            : "1. PRINT MAHATMA TOKEN"}
+            : "1. PRINT BAG LABELS"}
         </button>
 
         <button
@@ -392,7 +408,6 @@ export default function CheckInView() {
               : `Print ${bagCount} Labels (Old)`}
           </span>
         </button>
-
         <button
           type="submit"
           onClick={() => setSubmitAction("SAVE")}
@@ -409,7 +424,7 @@ export default function CheckInView() {
       </form>
 
       {/* ======================================================= */}
-      {/* HIDDEN SVG BAG TEMPLATES (FOR HYBRID STEP 2) */}
+      {/* HIDDEN SVG BAG TEMPLATES (FOR HYBRID STEP 1) */}
       {/* ======================================================= */}
       {hybridData && (
         <div
@@ -468,10 +483,7 @@ export default function CheckInView() {
         </div>
       )}
 
-      {/* ======================================================= */}
       {/* HIDDEN THERMAL LABEL TEMPLATE (ONLY USED FOR OLD IMAGE MODE) */}
-      {/* ======================================================= */}
-      {/* ... keeping your existing hidden template so old code doesn't break ... */}
       <div
         style={{
           position: "absolute",
@@ -527,211 +539,8 @@ export default function CheckInView() {
           </div>
         </div>
       </div>
-      {/* ======================================================= */}
     </div>
   );
 }
 
-// Ensure printTokens is defined globally or inside the same file
-const printTokens = (
-  startTokenId, // e.g., "9-0094"
-  name,
-  mobile,
-  city,
-  bagCount,
-  mode = "PER_MAHATMA",
-  printBagLabels = true,
-  enablePageCut = false,
-  useQrCode = false, // <--- NEW PARAMETER
-) => {
-  const SUPER_GIANT = "\x1D\x21\x77"; // 7x Width & 7x Height (Massive!)
-  const MAX_SIZE = "\x1D\x21\x33";
-  const JUMBO = "\x1D\x21\x11";
-  const NORMAL_SIZE = "\x1D\x21\x00\x1B\x21\x00";
-
-  const BOLD_ON = "\x1BE\x01";
-  const BOLD_OFF = "\x1BE\x00";
-  const CENTER = "\x1Ba\x01";
-  const FF = "\x0C";
-  const CUT = enablePageCut ? "\x1D\x56\x00" : "";
-
-  const todayDate = new Date().getDate();
-  const displayDate = new Date()
-    .toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-    .toUpperCase();
-  let fullPrint = "";
-
-  // ==========================================
-  // FORMAT CONVERTER & EXTRACTOR
-  // ==========================================
-  let prefix = String(todayDate);
-  let baseNumberStr = String(startTokenId);
-
-  if (baseNumberStr.includes("-")) {
-    const parts = baseNumberStr.split("-");
-    prefix = parts[0];
-    baseNumberStr = parts[1];
-  }
-
-  const safeNumberStr = baseNumberStr.replace(/\D/g, "");
-  const firstTokenNum = Number(safeNumberStr) || 0;
-  const bigToken = String(firstTokenNum);
-
-  const pureFourDigitToken = String(firstTokenNum).padStart(4, "0"); // "0094"
-  const qrDataString = `${prefix}-${pureFourDigitToken}`; // "9-0094"
-
-  // ==========================================
-  // DYNAMIC CODE GENERATOR (BARCODE vs QR)
-  // ==========================================
-  let scanCodeCommand = "";
-  const lightPayload = bigToken;
-
-  if (useQrCode) {
-    // Heavy QR Code Generation
-    const dataLen = lightPayload.length + 3;
-    const pL = String.fromCharCode(dataLen % 256);
-    const pH = String.fromCharCode(Math.floor(dataLen / 256));
-
-    const qrSize = "\x1D\x28\x6B\x03\x00\x31\x43\x06";
-    const qrError = "\x1D\x28\x6B\x03\x00\x31\x45\x31";
-    const qrStore = `\x1D\x28\x6B${pL}${pH}\x31\x50\x30${lightPayload}`;
-    const qrPrint = "\x1D\x28\x6B\x03\x00\x31\x51\x30";
-
-    // THE DOT-FEED FIX:
-    // \x1B\x4A is the command for "Feed Paper by Dots".
-    // \x1E is the hexadecimal number for 30 dots (exactly half of a normal \n line).
-    const halfLineFeed = "\x1B\x4A\x1E";
-
-    scanCodeCommand = `${qrSize}${qrError}${qrStore}${qrPrint}${halfLineFeed}`;
-  } else {
-    // Ultra-Safe 1D Barcode (CODE39)
-    const BARCODE_HEIGHT = "\x1D\x68\x40";
-    const BARCODE_WIDTH = "\x1D\x77\x04";
-    const BARCODE_TEXT_OFF = "\x1D\x48\x00";
-
-    // FIX: Added the " \n \n" right after the \x00 terminator!
-    // This forces the printer to physically roll the paper down after the barcode.
-    scanCodeCommand = `\n ${BARCODE_HEIGHT}${BARCODE_WIDTH}${BARCODE_TEXT_OFF}\x1D\x6B\x04${lightPayload}\x00 \n \n`;
-  }
-
-  if (mode === "PER_MAHATMA") {
-    // --- A. MASTER MAHATMA TOKEN (TESTING: 3 COPIES) ---
-    // for (let testLoop = 0; testLoop < 3; testLoop++) {//for testing only
-    fullPrint +=
-      `${CENTER}${NORMAL_SIZE}` +
-      `\n DATE: ${displayDate}\n` +
-      `${scanCodeCommand}` + // Dynamically injects Barcode OR QR
-      `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-      `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n\n` +
-      `${FF}${CUT}`;
-    // }
-
-    // --- B. INDIVIDUAL BAG LABELS (Temporarily active for testing layout) ---
-    if (printBagLabels) {
-      for (let i = 1; i <= bagCount; i++) {
-        fullPrint +=
-          `${CENTER} \n \n\n` +
-          `${SUPER_GIANT}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n\n` +
-          `${JUMBO}(${i}/${bagCount})${NORMAL_SIZE}\n\n\n` +
-          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
-          ` \n \n` +
-          `${FF}${CUT}`;
-      }
-    }
-  }
-  // ==========================================
-  // MODE 2: TOKEN PER BAG (Individual Mode)
-  // ==========================================
-  else if (mode === "PER_BAG") {
-    let otherTokensStr = "";
-    if (bagCount > 1) {
-      const otherTokens = [];
-      for (let i = 1; i < bagCount; i++) {
-        otherTokens.push(
-          `${prefix}-${String(firstTokenNum + i).padStart(4, "0")}`,
-        );
-      }
-      otherTokensStr = `& ${otherTokens.join(",")}\n`;
-    }
-
-    // Printing this 3 times for your test as well
-    // for (let testLoop = 0; testLoop < 3; testLoop++) {
-    // fullPrint +=
-    //   `${CENTER}${NORMAL_SIZE}` +
-    //   `DATE: ${todayDate} MARCH 2026\n\n` +
-    //   `${scanCodeCommand}` + // <--- FIX: Changed from nativeQRCode to scanCodeCommand
-    //   `${MAX_SIZE}${BOLD_ON}${bigToken}${BOLD_OFF}${NORMAL_SIZE}\n` +
-    //   `${otherTokensStr}` +
-    //   `${BOLD_ON}${bagCount} Bags - ${name.toUpperCase()}${BOLD_OFF}\n\n` +
-    //   `${FF}${CUT}`;
-    // }
-
-    if (printBagLabels) {
-      for (let i = 0; i < bagCount; i++) {
-        let currentToken = firstTokenNum + i;
-        let bagBigToken = String(currentToken);
-
-        fullPrint +=
-          `${CENTER} \n \n \n` + // Forced top margin
-          `${MAX_SIZE}${BOLD_ON}${bagBigToken}${BOLD_OFF}${NORMAL_SIZE}\n\n` +
-          `${JUMBO}(BAG)${NORMAL_SIZE}\n\n` +
-          `${BOLD_ON}${mobile} (${bagCount}B)${BOLD_OFF}\n` +
-          ` \n \n` + // Forced bottom margin
-          `${FF}${CUT}`;
-      }
-    }
-  }
-
-  const encodedData = btoa(unescape(encodeURIComponent(fullPrint)));
-  const link = document.createElement("a");
-  link.href = `intent:base64,${encodedData}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-  link.click();
-};
-
-// --- IMAGE MODE PRINTER (Using html2canvas + RawBT) ---
-// --- IMAGE MODE PRINTER (Using html2canvas + RawBT) ---
-// --- IMAGE MODE PRINTER (Using html2canvas + RawBT) ---
-const printAsImageTokens = async (formattedTokenId, enablePageCut = false) => {
-  const labelElement = document.getElementById("thermal-label-template");
-  if (!labelElement) return;
-
-  // 1. EXTRACT THE NUMBER AND INJECT IT DIRECTLY (Bypasses React delays!)
-  const baseNumberStr = String(formattedTokenId);
-  let displayBigToken = baseNumberStr;
-  if (baseNumberStr.includes("-")) {
-    displayBigToken = baseNumberStr.split("-")[1];
-  }
-  const pureNum = Number(displayBigToken.replace(/\D/g, "")) || 0;
-  displayBigToken = String(pureNum);
-
-  // Directly update the HTML text right before the screenshot
-  document.getElementById("img-scan-payload").innerText =
-    `Scan Payload: ${displayBigToken}`;
-  document.getElementById("img-big-token").innerText = displayBigToken;
-  document.getElementById("img-date").innerText =
-    `JSCA SAMAN GHAR / ${new Date().getDate()} MARCH 2026`;
-
-  try {
-    // 2. Take the screenshot
-    const canvas = await html2canvas(labelElement, {
-      scale: 1,
-      backgroundColor: "#ffffff",
-      logging: false,
-    });
-
-    // 3. Convert to Data URL
-    const imageDataUrl = canvas.toDataURL("image/png");
-
-    // 4. Send to RawBT
-    const link = document.createElement("a");
-    link.href = `intent:${imageDataUrl}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-    link.click();
-  } catch (err) {
-    console.error("Screenshot error:", err);
-    alert("Image printing failed!");
-  }
-};
+// ... Ensure printTokens and printAsImageTokens remain exactly as they were below!

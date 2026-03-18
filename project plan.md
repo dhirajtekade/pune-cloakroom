@@ -65,3 +65,9 @@ ALTER TABLE checkins AUTO_INCREMENT = 1001;
 -- Create an index on the status and mobile columns to make searches lightning fast
 CREATE INDEX idx_status ON checkins(status);
 CREATE INDEX idx_mobile ON checkins(mobile);
+
+---------------------
+
+TODO:
+- first print bag token and then mahatma token
+- on checkout scan cursor should get back on focus area to scan input again

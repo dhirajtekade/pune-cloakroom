@@ -107,9 +107,10 @@ export async function POST(request) {
     const displayToken = `${dateCode}-${String(nextSequence).padStart(4, "0")}`;
 
     // 5. Insert directly into the database (Much faster, no 2nd update needed!)
+    // 5. Insert directly into the database (Much faster, no 2nd update needed!)
     await sql`
-      INSERT INTO checkins (name, mobile, city, bag_count, status, display_token) 
-      VALUES (${name}, ${mobile}, ${city}, ${bagCount}, 'STORED', ${displayToken}) 
+      INSERT INTO checkins (name, mobile, city, bag_count, initial_bag_count, status, display_token) 
+      VALUES (${name}, ${mobile}, ${city}, ${bagCount}, ${bagCount}, 'STORED', ${displayToken}) 
     `;
 
     // 6. Trigger SMS ONLY if the Admin toggle is set to true
